@@ -2,7 +2,7 @@ import { globalData } from "./globalData"
 import router from '../router';
 import { reactive } from "vue";
 import store from "../store";
-import { EmergencyType } from "@autoxing/robot-js-sdk-dev/index.js";
+import { EmergencyType } from "@autoxing/robot-js-sdk/index.js";
 const useStore = store()
 //底盘状态
 var state: any = {}

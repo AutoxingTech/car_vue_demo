@@ -1,7 +1,7 @@
 
 <script lang="ts">
 import { defineComponent } from 'vue';
-import { ActionType } from "@autoxing/robot-js-sdk-dev/index.js";
+import { ActionType } from "@autoxing/robot-js-sdk/index.js";
 import { globalData } from "../../js/globalData"
 import { audioMode } from "../../js/globalConfig"
 export default defineComponent({

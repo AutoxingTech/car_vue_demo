@@ -12,7 +12,7 @@ import {
     appVersion,
 } from "../js/android";
 import { ref, watch, defineComponent } from "@vue/runtime-core";
-import { AXRobot } from "@autoxing/robot-js-sdk-dev/index.js";
+import { AXRobot } from "@autoxing/robot-js-sdk/index.js";
 import { okRequest, setToken } from "../js/okRequest";
 import { initTable } from '../js/Datacollation'
 import { appId, appSecret, robotId, appMode } from "../js/globalConfig";

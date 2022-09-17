@@ -1,5 +1,5 @@
 import { globalData } from '../js/globalData'
-import { AXRobot, AppMode, MotionType, EmergencyType } from '@autoxing/robot-js-sdk-dev/index.js'
+import { AXRobot, AppMode, MotionType, EmergencyType } from '@autoxing/robot-js-sdk/index.js'
 import { StandbyPoint, ChargingPile } from '../js/Datacollation'
 import store from '../store'
 const useStore: any = store()

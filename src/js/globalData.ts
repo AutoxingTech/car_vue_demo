@@ -1,4 +1,4 @@
-import { AXRobot } from "@autoxing/robot-js-sdk-dev/index.js";
+import { AXRobot } from "@autoxing/robot-js-sdk/index.js";
 export const globalData = {
     sn: String,
     axRobot: AXRobot,
