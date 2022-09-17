@@ -1,0 +1,35 @@
+{
+  "name": "my-careadg",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@autoxing/robot-js-sdk-dev": "^1.0.48",
+    "@vitejs/plugin-legacy": "^2.0.1",
+    "amfe-flexible": "^2.2.1",
+    "axios": "^0.27.2",
+    "pinia": "^2.0.22",
+    "postcss-px2rem": "^0.3.0",
+    "swiper": "^8.3.2",
+    "vue": "^3.2.38",
+    "vue-router": "^4.1.5",
+    "vue-slider-component": "^4.1.0-beta.2",
+    "vue3-loading-overlay": "^0.0.0",
+    "vuedraggable": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.7.14",
+    "@vitejs/plugin-vue": "^3.0.3",
+    "autoprefixer": "^10.4.8",
+    "less": "^4.1.3",
+    "postcss-pxtorem": "^6.0.0",
+    "typescript": "^4.6.4",
+    "vite": "^3.0.8",
+    "vue-tsc": "^0.39.5"
+  }
+}

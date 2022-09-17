@@ -1,0 +1,45 @@
+.font18W {
+  font-size: 23px;
+  color: #FFF;
+  line-height: 15px;
+}
+
+.font30B {
+  font-size: 30px;
+  color: #000;
+  font-weight: bold;
+}
+
+.blod {
+  font-weight: bold;
+}
+
+.vertical {
+  display: flex;
+  justify-content: center;
+}
+
+.horizontal {
+  display: flex;
+  align-items: center;
+}
+
+.ocenter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.landscape {
+  display: flex;
+  flex-direction: row;
+}
+
+.reverser {
+  flex-direction: row-reverse;
+}
+
+.portrait {
+  display: flex;
+  flex-direction: column;
+}
