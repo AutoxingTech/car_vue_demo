@@ -1,17 +1,13 @@
-import { AXRobot, AppMode } from "@autoxing/robot-js-sdk/index.js";
-
-const storage_key_url = "storage_key_url"
+import { AppMode } from "@autoxing/robot-js-sdk/index.js";
 
 
-const url = localStorage.getItem(storage_key_url)
-// const host=url==null?'https://mobileapp.autoxing.com':url
-const host = url == null ? 'https://devapi.autoxing.com/mobileapp/v1.1' : url
+export const baseUrl: any = "https://api.autoxing.com/mobileapp/v1.1"
+export const appId = "ax1498b3afe2fd____" 
+export const appSecret = "6ff7a110628f4d20822195221eec____"
+
+export const audioMode = 1 //1车机2底盘
+export const appMode = AppMode.WAN_APP
+export const robotId = "23922077002____"  //机器人sn
 
 
-// export const baseUrl: any = host
-// export const appId = "xxx" 
-// export const appSecret = "xxx"
 
-// export const audioMode = 1 //1车机2底盘
-// export const appMode = AppMode.WAN_APP
-// export const robotId = "xxx"  //机器人sn
