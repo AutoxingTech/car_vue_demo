@@ -131,7 +131,8 @@ export const okRequest = {
     * 巡游列表信息
     */
     CuriseList() {
-        return request("/cruise/list?businessId=" + globalData.businessId, null, "get")
+        return Promise.resolve([])
+        // return request("/cruise/list?businessId=" + globalData.businessId, null, "get")
     },
 
     /**
