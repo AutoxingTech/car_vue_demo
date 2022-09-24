@@ -10,7 +10,10 @@ const store = defineStore('Store', {
             showAbnormal: 0, //异常弹框
             customSetting: {}, //设置内容,
             robotstate: {},
-            nextpage: 0  //启动跳转设置 返回时使用判断
+            nextpage: 0,  //启动跳转设置 返回时使用判断
+            isModify: false,  //是否编辑模式
+            reFresh: false,  //是否刷新
+            vers: '' //车机地盘版本
         }
     },
     getters: {

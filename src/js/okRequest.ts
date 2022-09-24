@@ -1,10 +1,8 @@
 import { baseUrl } from "../js/globalConfig"
 import { Axios } from "axios"
 import { globalData } from "../js/globalData"
-import { useLoading } from 'vue3-loading-overlay';
+import { ControlLoading } from '../js/settingUtil'
 import store from "../store";
-let Loading = useLoading()
-const useStore = store()
 
 const instance = new Axios({
     baseURL: baseUrl,
@@ -24,12 +22,7 @@ function request(path: string, data: any = {}, method: string = "POST", commonfa
         "Content-Type": "application/x-www-form-urlencoded"
     }
     if (showloaddding) {
-        Loading.show({
-            color: '#83A9FF',
-            backgroundColor: '#ffffff',
-            opacity: 0,
-            zIndex: 9999,
-        });
+        ControlLoading(true)
     }
     return new Promise((resolve, reject) => {
         let reqfail: Function
@@ -40,7 +33,6 @@ function request(path: string, data: any = {}, method: string = "POST", commonfa
                 method: method,
                 headers: headers,
             }).then((res) => {
-                console.log("接口内容", res)
                 if (res.status == 200) {
                     if (res.data) {
                         let responeData = res.data
@@ -52,7 +44,8 @@ function request(path: string, data: any = {}, method: string = "POST", commonfa
                             }
                         }
                         if (responeData.status == 200) {
-                            Loading.hide()
+                            ControlLoading(false)
+                            console.log("接口内容", responeData.data)
                             resolve(responeData.data)
                         } else {
                             if (responeData.message && responeData.message.length > 0) {
@@ -84,12 +77,12 @@ function request(path: string, data: any = {}, method: string = "POST", commonfa
                 if (commonfail == true) {
                     //todo 调用通用错误处理
                     console.log("异常内容", err)
-                    useStore.$patch((state: any) => {
+                    store().$patch((state: any) => {
                         state.showAbnormal = 1
                     })
                     return new Promise(() => { })
                 } else {
-                    Loading.hide()
+                    ControlLoading(false)
                     reject()
                 }
             }
@@ -133,4 +126,25 @@ export const okRequest = {
         console.log(data, "param")
         return request("/robot_soft/save", JSON.stringify(data))
     },
+
+    /**
+    * 巡游列表信息
+    */
+    CuriseList() {
+        return request("/cruise/list?businessId=" + globalData.businessId, null, "get")
+    },
+
+    /**
+    * 语音播报内容
+    * {
+    *"businessId": "60d998a1fccc72d6fd363627",
+    *"businessType": 1,
+    *"taskType": 1,   // 1=送餐;2=配送;3=巡游;4=引领
+    *"robotId": "car_99999999"
+    *}
+    */
+    // return okRequest.broadcast_effect({ "businessId": globalData.businessId, "businessType": 1, "taskType": 3, "robotId": globalData.sn })
+    broadcast_effect(data: object) {
+        return request("/broadcast/effect", JSON.stringify(data))
+    }
 }

@@ -4,10 +4,12 @@ import { defineComponent, reactive, ref } from 'vue'
 import store from '../store';
 import router from '../router';
 import settingUtil from '../js/settingUtil'
+import { robotUtil } from '../js/robotUtil';
+import { currentfloor } from '../js//Datacollation'
 const userstore: any = store()
 export default defineComponent({
     setup() {
-
+        const CurrentF = currentfloor
         const modelList: any = reactive([
             {
                 id: 0,
@@ -45,6 +47,9 @@ export default defineComponent({
         //是否展示切换送餐模式的弹框
         const selcte_type = ref<boolean>(false)
         function changeType() {
+            if (userstore.isModify) {
+                return
+            }
             selcte_type.value = !selcte_type.value
         }
         //当前的模式是x
@@ -85,17 +90,22 @@ export default defineComponent({
                 })
             }
         }
-        function getStandby() {
-            console.log(settingUtil.getStandbyStation(), "待命点")
+        function goStandby() {
+            let standby = settingUtil.getStandbyStation()
+            console.log(standby, "standby")
+            settingUtil.goStandby(standby)
         }
-        return { current_Tab, selcte_type, modelList, changeType, gosetting, hiddenmask, changeTab, getStandby }
+        return { current_Tab, selcte_type, modelList, changeType, gosetting, hiddenmask, changeTab, goStandby, CurrentF }
     },
     beforeRouteEnter(to, from, next) {
         next((e: any) => {
-            // console.log(userstore.customSetting.basic.currenttab)
-            // if (userstore.customSetting.basic.currenttab) {
-            //     e.current_Tab = userstore.customSetting.basic.currenttab
-            // }
+            robotUtil.getState_P().then((res: any) => {
+                if (res.isEmergencyStop == true) {
+                    router.push({
+                        path: "/crashstop"
+                    })
+                }
+            })
             //判断tab的现实问题
             if (!userstore.customSetting.basic.model) {
                 for (let i of e.modelList) {
@@ -140,11 +150,11 @@ export default defineComponent({
                 </div>
             </div>
 
-            <div class="return_box" @click="getStandby">
+            <div class="return_box" @click="goStandby">
                 <img src="../assets/img/dirction.png">
                 <div>返航</div>
             </div>
-            <div class="current_local">当前机器人定位：19L</div>
+            <div class="current_local">当前机器人定位：{{CurrentF}}L</div>
         </div>
         <router-view v-slot="{ Component }">
             <keep-alive>

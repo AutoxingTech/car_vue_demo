@@ -1,82 +1,57 @@
 <script lang="ts" setup>
-import { reactive, ref } from 'vue';
+import { ref } from 'vue';
 import VueSlider from 'vue-slider-component'
 import 'vue-slider-component/theme/default.css'
 import PallentSetting from '../Setting/component/PallentSetting.vue';
-
 import store from '../../store';
-import { val } from 'dom7';
 const useStore: any = store()
-let palletfic: any = useStore.customSetting.delivery.pallet
-const pallet: any = ref(useStore.customSetting.delivery.pallet);
-let nums = 0  //灯总个数
-let hasindex: any = []  //有灯的下标
-let collationPallet: any = [0, 0, 0, 0,]
-palletfic.forEach((item: any, index: number) => {
-    nums += item
-    if (item > 0) {
-        hasindex.push(index)
-    }
-})
+const pallet: any = ref(useStore.customSetting.delivery.pallet); //托盘灯带数量
+//到达取物点等待时长
 
-if (nums > 24) {
-    let one = 24 / hasindex.length  //若大于24 现有的托盘平均分24
-    for (let i in hasindex) {
-        collationPallet[i] = one
-    }
-    useStore.$patch((state: any) => {
-        state.customSetting.delivery.pallet = collationPallet
-        pallet.value = state.customSetting.delivery.pallet
-        console.log(pallet.value, "pallet")
-    })
-}
-const time1 = ref(useStore.customSetting.delivery.stopDuration) //到达取物点等待时长
-
+const time1 = ref(useStore.customSetting.delivery.stopDuration)
 const options1: any = ref({
     min: 10,
     max: 300,
     tooltip: 'always'
 })
-
 const Time1change = (e: any) => {
     useStore.$patch((state: any) => {
         state.customSetting.delivery.stopDuration = e
     })
 }
 
+//暂停后倒计时时长
 const time2 = ref(useStore.customSetting.delivery.pauseDuration)
-const options2: any = ref({  //暂停后倒计时时长
+const options2: any = ref({
     min: 10,
     max: 60,
     tooltip: 'always'
 })
-
 const Time2change = (e: any) => {
     useStore.$patch((state: any) => {
         state.customSetting.delivery.pauseDuration = e
     })
 }
 
+// 行走速度
 const speed1 = ref(useStore.customSetting.delivery.runSpeed)
 const options3: any = ref({
     min: 10,
     max: 80,
     tooltip: 'always'
 })
-
 const speed1change = (e: any) => {
     useStore.$patch((state: any) => {
         state.customSetting.delivery.runSpeed = e
     })
 }
 
-
+//修改托盘相关信息
 const showPallent = ref(false)
 const Pallentset = () => {
     showPallent.value = !showPallent.value
 }
 const setlastPallent = (e: any) => {
-    console.log(e, "执行了吗")
     pallet.value = e
     useStore.$patch((state: any) => {
         state.customSetting.delivery.pallet = e

@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import router from '../router';
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import settingUtil from '../js/settingUtil';
+import { OpenSetting } from '../js/android';
 import store from '../store';
+import { toast } from './Toast/Toast';
+import { AppMode, devurl, disurl, storage_key_url, storage_key_app_mode, storage_key_sn } from '../js/globalConfig';
+
+
 const useStore = store()
 function exitSetting() {
     if (useStore.nextpage == 1) {
@@ -16,6 +21,8 @@ function exitSetting() {
         router.go(-1)
     }
 }
+
+
 const showTapApk = ref(false)
 const current_Set = ref(4)
 const setList: any = [
@@ -104,7 +111,66 @@ const ModelClick = (e: number) => {
     }
     if (e == 5) {
         console.log("系统设置")
+        OpenSetting()
     }
+}
+
+onMounted(() => {
+    let obj: any = localStorage.getItem("hiddenSettings")
+    if (obj) {
+        obj = JSON.parse(obj)
+        hiddenSettings.serv = obj.serv;
+        hiddenSettings.mode = obj.mode;
+        hiddenSettings.sn = obj.sn;
+    }
+})
+
+const hiddenSettings = reactive({
+    times: 0,
+    visible: false,//显示隐藏
+    mode: 0, //0广域 1本地
+    serv: 1, //0开发 1生产
+    sn: ""
+})
+
+function hiddenSettingsmode(mode: any) {
+    hiddenSettings.mode = mode
+}
+function hiddenSettingsserv(serv: any) {
+    hiddenSettings.serv = serv
+}
+
+function hiddenSetting() {
+    hiddenSettings.times++
+    if (hiddenSettings.times % 10 == 9) {
+        hiddenSettings.visible = true
+    } else {
+        hiddenSettings.visible = false
+    }
+}
+function hiddenSettingConfim() {
+    if (hiddenSettings.mode == 1) {
+        localStorage.setItem(storage_key_app_mode, "1")
+        console.log(storage_key_app_mode, "1")
+    } else {
+        if (hiddenSettings.sn.length != 15) {
+            toast.show("sn长度15")
+            return
+        } else {
+            localStorage.setItem(storage_key_sn, hiddenSettings.sn)
+            localStorage.setItem(storage_key_app_mode, "0")
+            console.log(storage_key_app_mode, "0")
+        }
+    }
+    if (hiddenSettings.serv == 0) {
+        localStorage.setItem(storage_key_url, devurl)
+        console.log(storage_key_url, devurl)
+    } else {
+        localStorage.setItem(storage_key_url, disurl)
+        console.log(storage_key_url, disurl)
+    }
+    localStorage.setItem("hiddenSettings", JSON.stringify(hiddenSettings))
+
 }
 
 </script>
@@ -163,6 +229,24 @@ const ModelClick = (e: number) => {
                             <div>修改密码</div>
                         </div>
                     </div>
+                    <div v-if="hiddenSettings.visible" class="sys_user_setting" style="border-radius: 13px 13px 0 0;">
+                        <div @click="hiddenSettingsmode(1)"
+                            :class="hiddenSettings.mode==1?'sys_user_setting_sel':'sys_user_setting_unsel'">本地模式</div>
+                        <div @click="hiddenSettingsmode(0)"
+                            :class="hiddenSettings.mode==0?'sys_user_setting_sel':'sys_user_setting_unsel'">广域网模式</div>
+                        <input placeholder="SN" v-model="hiddenSettings.sn"
+                            style="padding-left: 24px;margin-top: 14px;border-radius: 8px;margin-left: 12px;height: 38px;width: 180px;font-weight: bold;font-size: 18px;color: cornflowerblue;" />
+                    </div>
+                    <div v-if="hiddenSettings.visible" class="sys_user_setting"
+                        style="margin-top: 1px;border-radius:0 0 13px 13px;">
+                        <div @click="hiddenSettingsserv(0)"
+                            :class="hiddenSettings.serv==0?'sys_user_setting_sel':'sys_user_setting_unsel'">测试环境</div>
+                        <div @click="hiddenSettingsserv(1)"
+                            :class="hiddenSettings.serv==1?'sys_user_setting_sel':'sys_user_setting_unsel'">生产环境</div>
+                        <div style="flex:1"></div>
+                        <div @click="hiddenSettingConfim()" class="sys_user_setting_sel"
+                            style="margin-right: 32px;background-color: #608FFA;">确定</div>
+                    </div>
                     <!-- <div class="sys_setting">
                         <div>
                             <div>
@@ -172,7 +256,7 @@ const ModelClick = (e: number) => {
                         </div>
                     </div> -->
                     <div class="sys_message">
-                        <div class="sys_message_top font4">系统信息</div>
+                        <div @click="hiddenSetting()" class="sys_message_top font4">系统信息</div>
                         <div class="sys_onemessage">
                             <div>机器人类型</div>
                             <div>暂无信息</div>
@@ -209,9 +293,7 @@ const ModelClick = (e: number) => {
                         </div>
                     </div>
                 </div>
-
             </div>
-
         </div>
     </div>
 </template>
@@ -222,7 +304,7 @@ const ModelClick = (e: number) => {
 }
 
 .tip {
-    height: 84px;
+    height: 24px;
     width: 1255px;
     margin: 0 auto;
 }
@@ -230,12 +312,12 @@ const ModelClick = (e: number) => {
 .set_content {
     width: 100%;
     display: flex;
-    height: calc(100% - 84px);
+    height: calc(100% - 24px);
 }
 
 .set_left {
     width: 323px;
-    height: calc(100vh - 84px);
+    height: calc(100vh - 24px);
     background-color: white;
     border-radius: 0px 13px 13px 0px;
     position: relative;
@@ -243,7 +325,7 @@ const ModelClick = (e: number) => {
 
 .set_right {
     width: 908px;
-    height: calc(100vh - 84px);
+    height: calc(100vh - 24px);
     margin-left: 29px;
     overflow-y: scroll;
 
@@ -399,8 +481,39 @@ const ModelClick = (e: number) => {
 }
 
 
+.sys_user_setting {
+    width: 100%;
+    background: #FFFFFF;
+    border-radius: 13px;
+    margin-top: 12px;
+    position: relative;
+    display: flex;
+    flex-direction: row;
+}
 
+.sys_user_setting_sel {
+    height: 42px;
+    line-height: 42px;
+    border-radius: 8px;
+    width: 120px;
+    font-size: 18px;
+    color: #333;
+    text-align: center;
+    margin: 12px 12px 12px 24px;
+    background-color: #83A9FF
+}
 
+.sys_user_setting_unsel {
+    height: 42px;
+    line-height: 42px;
+    border-radius: 8px;
+    width: 120px;
+    font-size: 18px;
+    color: #666;
+    text-align: center;
+    margin: 12px 12px 12px 32px;
+    background-color: #F1F2F6;
+}
 
 .sys_setting {
     height: 86px;
@@ -418,9 +531,6 @@ const ModelClick = (e: number) => {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
 }
 
 .now_lan {

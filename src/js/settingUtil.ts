@@ -1,42 +1,52 @@
-import { globalData } from '../js/globalData'
-import { AXRobot, AppMode, MotionType, EmergencyType } from '@autoxing/robot-js-sdk/index.js'
-import { StandbyPoint, ChargingPile } from '../js/Datacollation'
+import { robotUtil } from './robotUtil'
+import { StandbyPoint, ChargingPile, songlist } from '../js/Datacollation'
 import store from '../store'
-const useStore: any = store()
-const AbnormalShow = () => {
-    useStore.$patch((state: any) => {
-        useStore.showAbnormal = 1
-    })
+import { useLoading } from 'vue3-loading-overlay';
+import { webRefresh, app } from './android'
+export const Loading = useLoading()
+export const ControlLoading = (e: boolean) => {
+    if (e) {
+        Loading.show({ color: '#83A9FF', backgroundColor: '#ffffff', opacity: 0.1, zIndex: 9999 });
+    } else {
+        let chArr = document.getElementsByClassName("vld-overlay");
+        if (chArr) {
+            for (var i = 0; i < chArr.length; i++) {
+                let charArry: any = chArr[i]
+                if (charArry != null) {
+                    charArry.parentNode.removeChild(chArr[i]);
+                }
+            }
+        }
+    }
 }
+
 export default {
     //重启app
     restart() {
-        console.log("重启app")
+        if (!app) {
+            store().$patch((state: any) => {
+                state.reFresh = true
+            })
+        }
+        webRefresh('')
     },
     //设置为自动模式
     autoModel: () => {
-        return globalData.axRobot.motionFor(MotionType.Auto).catch(() => {
-            AbnormalShow()
-        })
+        return robotUtil.motionForAuto()
     },
     //设置为手动模式
     manualModel: () => {
-        return globalData.axRobot.motionFor(MotionType.Manual).catch(() => {
-            AbnormalShow()
-        })
+        return robotUtil.motionForManual()
     },
     //充电桩复位
     setPos: (item: any) => {
-        return globalData.axRobot.resetMap(item.areaId).then(() => {
-            return globalData.axRobot.resetPose({ x: item.coordinate[0], y: item.coordinate[1], yaw: item.yaw }).then(() => {
-                return globalData.axRobot.motionFor(MotionType.Auto)
-            })
-        }).catch(() => {
-            AbnormalShow()
+        return robotUtil.resetMap(item.areaId).then(() => {
+            return robotUtil.resetPose({ x: item.coordinate[0], y: item.coordinate[1], yaw: item.yaw })
         })
     },
     //返航 取待命点
     getStandbyStation: () => {
+        const useStore: any = store()
         let returnPoin: any = [...StandbyPoint, ...ChargingPile]
         let station: any
         if (!useStore.customSetting.basic.standby || useStore.customSetting.basic.standby == "") {
@@ -60,10 +70,8 @@ export default {
 
     //取充电桩
     getChargeStation: () => {
+        const useStore: any = store()
         let powerPoint: any = ChargingPile
-        if (!useStore.customSetting.basic.char || useStore.customSetting.basic.char == "") {
-            useStore.customSetting.basic.char = powerPoint[0].id
-        }
         let station: any
         if (!useStore.customSetting.basic.char || useStore.customSetting.basic.char == "") {
             station = powerPoint[0]
@@ -81,5 +89,106 @@ export default {
         station.is_charging = true
         return station
     },
+
+    //回桩充电
+    goCharpile: (standby: any) => {
+        const useStore: any = store()
+        let task = {
+            name: "充电任务" + new Date().getTime(),
+            runNum: 1,
+            taskType: 2,
+            runType: 25,  //25回桩充电
+            curPt: {
+                ext: {
+                    name: "起点",//起点要做的事件
+                },
+                stepActs: [
+                    {
+                        type: 41,  //设置速度
+                        data: {
+                            speed: useStore.customSetting.delivery.runSpeed / 100
+                        }
+                    },
+                ],
+            },
+            pts: [{
+                x: standby.coordinate[0],
+                y: standby.coordinate[1],
+                yaw: standby.yaw,
+                ext: {
+                    name: standby.name,
+                    id: standby.id,
+                    areaId: standby.areaId
+                },
+                stepActs: [
+
+                ],
+            }],
+            backPt: {}
+        };
+        robotUtil.startTask(task)
+    },
+
+    //返航待命点
+    goStandby: (standby: any) => {
+        const useStore: any = store()
+        let task = {
+            name: "返航任务" + new Date().getTime(),
+            runNum: 1,
+            taskType: 2,
+            runType: 24, //返航24
+            curPt: {
+                ext: {
+                    name: "起点",//起点要做的事件
+                },
+                stepActs: [
+                    {
+                        type: 41,  //设置速度
+                        data: {
+                            speed: useStore.customSetting.delivery.runSpeed / 100
+                        }
+                    },
+                ],
+            },
+            pts: [{
+                x: standby.coordinate[0],
+                y: standby.coordinate[1],
+                yaw: standby.yaw,
+                ext: {
+                    name: "返航中",
+                    id: standby.id,
+                    areaId: standby.areaId
+                },
+                stepActs: [
+                ],
+            }],
+            backPt: {}
+        };
+        robotUtil.startTask(task)
+    },
+
+
+    //取背景音乐
+    getbackgroundSong: () => {
+        const useStore: any = store()
+        let songlists: any = songlist
+        let song = null
+        if (!useStore.customSetting.sound.musicFile || useStore.customSetting.sound.musicFile == "") {
+            song = songlists[0]
+        } else {
+            for (let i of songlists) {
+                if (i.id == useStore.customSetting.sound.musicFile) {
+                    song = i
+                    break
+                }
+            }
+        }
+        if (song == null && songlists.length > 0) {
+            song = songlists[0]
+        }
+        return song.id
+    }
+
+
 
 }

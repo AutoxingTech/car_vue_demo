@@ -8,10 +8,15 @@ let curTime: any = 0 //当前时间戳
 let lastTime: any = 0 //最后一次点击的时间戳
 //关闭异常弹框 操作
 const closeAbor = () => {
-    // settingUtil.restart()
-    storeMe.$patch((state: any) => {
-        state.showAbnormal = 0
-    })
+    if (router.currentRoute.value.path == "/starup") {
+        location.reload()
+    } else {
+        settingUtil.restart()
+        storeMe.$patch((state: any) => {
+            state.showAbnormal = 0
+        })
+    }
+
 }
 const cleanData = () => {
     tap_num = 0
@@ -25,9 +30,11 @@ const startBluetooth = () => {
         curTime = Math.round(time1);
         lastTime = Math.round(time1);
     } else if (tap_num == 10) {
-        if (curTime - lastTime < 300) {
+        if (curTime - lastTime < 3000) {
             cleanData()
-            closeAbor()
+            storeMe.$patch((state: any) => {
+                state.showAbnormal = 0
+            })
             console.log(router.currentRoute.value.path)
             //不再启动页或者模拟设置页面 关闭弹框并且回到首页
             if (router.currentRoute.value.path !== "/starup" && router.currentRoute.value.path !== "/ficsetting" && router.currentRoute.value.path.indexOf('/index') < 0) {
@@ -59,7 +66,7 @@ const startBluetooth = () => {
                     <img src="../assets/img/robotstop.png" style="width:100%;height: 100%;">
                 </div>
                 <div class="tip1">机器人状态异常</div>
-                <div class="tip2">点击按键进行重启</div>
+                <div class="tip2">请将机器人推至充电脏重启</div>
                 <div class="enter1" @click="closeAbor">重启</div>
             </div>
         </div>

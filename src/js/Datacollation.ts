@@ -1,6 +1,39 @@
 
-import { json } from 'stream/consumers'
 import { ref, reactive } from 'vue'
+import { globalData } from './globalData'
+import { robotUtil } from './robotUtil'
+import { okRequest } from './okRequest'
+
+export const songlist: any = reactive([
+    {
+        name: '春の温度',
+        id: '3111501'
+    },
+    {
+        name: 'Minuet',
+        id: '3111502'
+    },
+    {
+        name: 'Happy Birthday To You',
+        id: '3111503'
+    },
+    {
+        name: 'Frühlingslied',
+        id: '3111504'
+    },
+    {
+        name: 'Bach in C Major bwv',
+        id: '3111505'
+    },
+    {
+        name: 'cromox',
+        id: '3111506'
+    },
+    {
+        name: 'hai-kuo-tian-kong-piano',
+        id: '3111507'
+    }
+])
 
 export const tables: any = reactive([{
     "img": "../../static/image/cg1.png",
@@ -49,41 +82,101 @@ export const tables: any = reactive([{
 }])
 export let StandbyPoint = []  //待命点
 export let ChargingPile = []  //充电桩
-const currentfloor: any = ref(-99)  //当前楼层
+export let CuriseLists = []  //巡游列表
+export let EffectivFloor = [] //当前可用楼层
+export let poiMap: any = {}  //自定义音乐
+export let AFMap: any = {} //楼层和areaid对应关系
+export let currentfloor: any = -99  //当前楼层
+export const setCurrentFloor = (areaId: string) => {  //设置当前楼层
+    for (const key in AFMap) {
+        if (AFMap[key] == areaId) {
+            currentfloor = key
+            //设置高亮和首页当前swiper
+            setSwiper()
+            break
+        }
+    }
+}
+let Allstaion: any = []
+const CollationStaions = () => {   // AFMap, "楼层和areaid对应关系"
+    for (let item of Allstaion) {
+        if (AFMap[item.floor + ""] == undefined) {
+            AFMap[item.floor + ""] = item.areaId
+        }
+    }
+}
+//设置swiper
+const setSwiper = () => {
+    for (let i in tables) {
+        if (Number(i) < 3) {
+            for (let j in tables[i].boardlist2) {
+                if (tables[i].boardlist2[j][0].floor == currentfloor) {
+                    tables[i].swipertab2 = Number(j)
+                }
+            }
+            for (let j in tables[i].boardlist) {
+                if (tables[i].boardlist[j][0].floor == currentfloor) {
+                    tables[i].swipertab = Number(j)
+                }
+            }
+        }
+    }
+    let currentindex: any = 0
+    for (let p in EffectivFloor) {
+        if (EffectivFloor[p] == currentfloor) {
+            currentindex = p
+        }
+    }
+    for (let i in tables) {
+        if (Number(i) < 3) {
+            for (let item of tables[i].floorlist) {
+                item.sel = false
+            }
+            for (let item of tables[i].floorlist2) {
+                item.sel = false
+            }
+            tables[i].floorlist[currentindex].sel = true
+            tables[i].floorlist2[currentindex].sel = true
+        }
+    }
+}
 
 const setmessage = (index: number, type: number, num: number, data: any) => {
-    type == 12 ? (tables[index].floorlist2 = getFloor(data)) : (tables[index].floorlist = getFloor(data))
+    type == 12 ? (tables[index].floorlist2 = getFloor()) : (tables[index].floorlist = getFloor())
     type == 12 ? (tables[index].boardlist2 = Arraysort(data, num)) : (tables[index].boardlist = Arraysort(data, num))
     type == 12 ? (tables[index].swipertab2 = getSwiperindex(tables[index].boardlist2)) : (tables[index].swipertab = getSwiperindex(tables[index].boardlist))
 }
 const freshList = (e: any) => {
+    if (e == null) {
+        e = []
+    }
     return JSON.parse(JSON.stringify(e))
 }
 //获取当前楼层对应的swiperindex
 const getSwiperindex = (list: any) => {
     for (let i in list) {
-        if (list[i][0].floor == currentfloor.value) {
+        if (list[i][0].floor == currentfloor) {
             return Number(i)
         }
     }
     return 0
 }
 //获取楼层
-const getFloor = (e: any) => {
+const getFloor = () => {
     let Flist = []
     let floorIndex = 0
-    for (let i of e) {
+    for (let i of EffectivFloor) {
         let has = false
         Flist.forEach((item) => {
-            if (item.name == i.floor) {
+            if (item.name == i) {
                 has = true
             }
             //等于currentfloor设置为高亮
-            if (i.floor == currentfloor) {
+            if (i == currentfloor) {
                 floorIndex = i
             }
         })
-        if (has == false) { Flist.push({ name: i.floor, sel: false }) }
+        if (has == false) { Flist.push({ name: i, sel: false }) }
         Flist[floorIndex].sel = true
     }
     return Flist
@@ -121,7 +214,7 @@ const Arraysort = (resData: any, num: number) => {
     for (let l in Data) {
         lastdata.push(...split_array(Data[l].dataInfo, num))
     }
-    let floorlist: any = getFloor(resData)
+    let floorlist: any = getFloor()
     //添加无站点的空swiper
     let newtable = []
     for (let k in floorlist) {
@@ -147,33 +240,61 @@ const Arraysort = (resData: any, num: number) => {
     return newtable
 }
 
-export const initTable = (axRobot: any, resolve: any, reject: any) => {
-    // return axRobot.getAreaList().then((res: any) => {
-    // floors[0] = res.data.list
-    // console.log(floors, "楼层")
-    return axRobot.getPoiList({ type: 11 }).then((res: any) => {
-        setmessage(0, 11, 12, freshList(res.list))  //快捷餐桌数据
-        setmessage(1, 11, 15, freshList(res.list))  //多点餐桌数据
-        setmessage(2, 11, 15, freshList(res.list))  //引领餐桌数据
-        axRobot.getPoiList({ type: 12 }).then((res: any) => {
+//获取bussinishid
+const getbussinessId = (list: any) => {
+    if (list != null && list.length != 0) {
+        globalData.businessId = list[0].businessId
+        Allstaion = [...Allstaion, ...list]
+    }
+
+}
+
+export const initTable = () => {
+    return robotUtil.getEffectiveAreaList({ effective: true }).then((res: any) => {
+        EffectivFloor = res.data.effective  //当前可用楼层
+        currentfloor = EffectivFloor[0]  //楼层设置默认显示为第一个
+        return robotUtil.getPoiList({ type: 11 }).then((res: any) => {
+            setmessage(0, 11, 12, freshList(res.list))  //快捷餐桌数据
+            setmessage(1, 11, 15, freshList(res.list))  //多点餐桌数据
+            setmessage(2, 11, 15, freshList(res.list))  //引领餐桌数据
+            getbussinessId(res.list)
+            return robotUtil.getPoiList({ type: 12 })
+        }).then((res: any) => {
             setmessage(0, 12, 12, freshList(res.list))  //快捷包间数据
             setmessage(1, 12, 15, freshList(res.list))  //多点包间数据
             setmessage(2, 12, 15, freshList(res.list))  //引领包间数据
-            axRobot.getPoiList({ type: 10 }).then((res: any) => {
+            getbussinessId(res.list)
+            return robotUtil.getPoiList({ type: 10 })
+        }).then((res: any) => {
+            if (res.list != null) {
                 StandbyPoint = res.list
-                axRobot.getPoiList({ type: 9 }).then((res: any) => {
-                    ChargingPile = res.list
-                    resolve(1)
-                })
-            })
-
-
-        }).catch((errMsg: String) => {
-            reject(errMsg)
+                Allstaion = [...Allstaion, ...res.list]
+            }
+            return robotUtil.getPoiList({ type: 9 })
+        }).then((res: any) => {
+            if (res.list != null) {
+                ChargingPile = res.list
+                Allstaion = [...Allstaion, ...res.list]//获取充电桩列表
+            }
+            return robotUtil.getPoiList({ type: 6 })
+        }).then((res: any) => {
+            if (res.list != null) {
+                Allstaion = [...Allstaion, ...res.list] //获取电梯点
+            }
+            CollationStaions()
+            return okRequest.CuriseList()
+        }).then((res: any) => {
+            CuriseLists = res      //获取巡游地图列表
+            let promiselist = []
+            for (let i of [1, 2, 3, 4]) {    // "taskType": 1,       1=巡游;2=配送;3=引领;4=行为
+                promiselist.push(
+                    okRequest.broadcast_effect({ "businessId": globalData.businessId, "businessType": 1, "taskType": i, "robotId": globalData.sn }).then((res: any) => {
+                        poiMap[i + ""] = res.poiMap
+                    })
+                )
+            }
+            return Promise.all(promiselist)   //console.log(poiMap, "背景声音列表")
         })
-    }).catch((errMsg: String) => {
-        reject(errMsg)
-    })
 
-    // })
+    })
 }

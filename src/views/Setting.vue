@@ -4,6 +4,7 @@ import { ref, defineComponent } from 'vue'
 import store from '../store'
 import { okRequest } from "../js/okRequest";
 import { globalData } from '../js/globalData';
+import SettingPassVue from '../components/SettingPass.vue';
 const useStore = store()
 function exitSetting() {
     console.log(useStore.customSetting)
@@ -14,6 +15,11 @@ function exitSetting() {
     }).then((res) => {
         console.log(res, "res:保存设置")
     })
+    router.push({
+        path: '/index'
+    })
+}
+function passback() {
     router.push({
         path: '/index'
     })
@@ -66,7 +72,11 @@ const selectCurrent = (e: number) => {
         router.push('/setting/SystemSetting')
     }
 }
-defineExpose({ selectCurrent, current_Set });
+const PasswordControl = ref(true)
+const hiddenPass = () => {
+    PasswordControl.value = false
+}
+defineExpose({ selectCurrent, current_Set, PasswordControl });
 </script>
 
 <script lang="ts">
@@ -75,13 +85,18 @@ export default defineComponent({
         next((vm) => {
             const instance: any = vm;
             instance.selectCurrent(instance.current_Set)
+            if (from.fullPath != '/task') {
+                instance.PasswordControl = true
+            }
+
         });
     },
 });
 </script>
 
 <template>
-    <div class="all">
+    <SettingPassVue :PasswordControl="PasswordControl" @passback="passback" @passin="hiddenPass" />
+    <div class=" all">
         <div class="tip">
             <navbarVue :heights="'84'" />
         </div>

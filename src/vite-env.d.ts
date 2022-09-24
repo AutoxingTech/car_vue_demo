@@ -6,4 +6,5 @@ declare module '*.vue' {
   export default component
 }
 
+declare module '@autoxing/robot-js-sdk-dev/index.js'
 declare module '@autoxing/robot-js-sdk/index.js'

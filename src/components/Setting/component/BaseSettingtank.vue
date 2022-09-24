@@ -1,6 +1,5 @@
 <script lang="ts" setup>
 import { reactive, ref } from 'vue';
-import Control from 'vue-slider-component/lib/utils/control';
 
 const props = defineProps<{
     controlType: number,  //显示的是那个弹框 1字号大小选择
@@ -131,8 +130,6 @@ const LastChange_char = () => {
     emits('change-char', Defaultcharplie.value)
 }
 
-
-
 </script>
 
 <template>
@@ -147,8 +144,8 @@ const LastChange_char = () => {
                     {{item.name}}
                 </div>
                 <div class="">
-                    <img :src="fontSizetype==item.sizetype?'/src/assets/img/language1.png':'/src/assets/img/selout.png'"
-                        alt="">
+                    <img v-if="fontSizetype==item.sizetype" src="../../../assets/img/language1.png" alt="">
+                    <img v-else src="../../../assets/img/selout.png" alt="">
                 </div>
             </div>
             <div class="base_tip_meth font7">
@@ -166,8 +163,8 @@ const LastChange_char = () => {
                     {{item.name}}
                 </div>
                 <div class="">
-                    <img :src="index==Defaultdisplay?'/src/assets/img/language1.png':'/src/assets/img/selout.png'"
-                        alt="">
+                    <img v-if="index==Defaultdisplay" src="../../../assets/img/language1.png" alt="">
+                    <img v-else src="../../../assets/img/selout.png" alt="">
                 </div>
             </div>
             <div class="base_tip_meth font7">
@@ -187,8 +184,8 @@ const LastChange_char = () => {
                         {{item.name}}
                     </div>
                     <div class="">
-                        <img :src="item.id==Defaultstandby?'/src/assets/img/language1.png':'/src/assets/img/selout.png'"
-                            alt="">
+                        <img v-if="item.id==Defaultstandby" src="../../../assets/img/language1.png" alt="">
+                        <img v-else src="../../../assets/img/selout.png" alt="">
                     </div>
                 </div>
             </div>
@@ -206,8 +203,8 @@ const LastChange_char = () => {
                     {{item.name}}
                 </div>
                 <div class="">
-                    <img :src="item.id==guideplaytype?'/src/assets/img/language1.png':'/src/assets/img/selout.png'"
-                        alt="">
+                    <img v-if="item.id==guideplaytype" src="../../../assets/img/language1.png" alt="">
+                    <img v-else src="../../../assets/img/selout.png" alt="">
                 </div>
             </div>
 
@@ -230,8 +227,8 @@ const LastChange_char = () => {
                         {{item.name}}
                     </div>
                     <div class="">
-                        <img :src="item.id==Defaultcharplie?'/src/assets/img/language1.png':'/src/assets/img/selout.png'"
-                            alt="">
+                        <img v-if="item.id==Defaultcharplie" src="../../../assets/img/language1.png" alt="">
+                        <img v-else src="../../../assets/img/selout.png" alt="">
                     </div>
                 </div>
             </div>

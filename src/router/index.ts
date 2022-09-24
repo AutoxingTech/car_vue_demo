@@ -93,6 +93,11 @@ const routes: Array<RouteRecordRaw> = [
         name: 'ficsetting',
         component: () => import('../components/ficsetting.vue')
     },
+    {
+        path: '/wifesetting',
+        name: 'WifeSetting',
+        component: () => import('../components/WifeSetting.vue')
+    },
 ]
 
 const router = createRouter({

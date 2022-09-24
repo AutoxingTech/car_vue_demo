@@ -1,6 +1,9 @@
-import { AXRobot } from "@autoxing/robot-js-sdk/index.js";
+import { ref } from "vue"
+
 export const globalData = {
     sn: String,
-    axRobot: AXRobot,
-    H5Version: '1.0.3'
+    businessId: '',
 }
+
+//急停状态
+export const CrashStatus = ref(0)

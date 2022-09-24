@@ -100,7 +100,10 @@ function Numtotal() {
                 <div v-for="(item,index) in pallentList" :key="index">
                     <div class="p_top_let">{{item.name}}</div>
                     <div class="p_top_right">
-                        <img :src="item.num!=0?'/src/assets/img/language1.png':'/src/assets/img/selout.png'" />
+                        <img v-if="item.num==0" src="../../../assets/img/selout.png" />
+                        <img v-else src="../../../assets/img/language1.png" />
+
+                        <!-- <img :src="item.num!=0?'/src/assets/img/language1.png':'/src/assets/img/selout.png'" /> -->
                     </div>
                     <div class="p_bottom_left">灯带数量设置</div>
                     <div class="p_bottom_right">

@@ -5,12 +5,16 @@ import switchLanguage from './component/Switchlanguage.vue'
 import store from '../../store';
 import settingUtil from '../../js/settingUtil'
 import { ChargingPile } from '../../js/Datacollation'
-import { globalData } from '../../js/globalData';
-import { useLoading } from 'vue3-loading-overlay';
+import { globalData, } from '../../js/globalData';
+import { ControlLoading } from '../../js/settingUtil'
 import { toast } from '../Toast/Toast'
-let Loading = useLoading()
+import { OpenSetting, appVersion } from '../../js/android'
+import { H5Version } from '../../js/globalConfig'
+import router from '../../router';
+
 let ChargingPileList: any = ChargingPile
 const useStore: any = store()
+const CurrentappVersion = ref(appVersion())
 const modetype: any = reactive([{
     id: 1,
     name: '自动模式',
@@ -44,13 +48,15 @@ const modetype: any = reactive([{
     sel: false,
     img1: new URL('../../assets/img/sys_5.png', import.meta.url),
     img2: new URL('../../assets/img/sys_5.png', import.meta.url),
-}, {
+},
+{
     id: 6,
     name: 'WLAN',
     sel: false,
     img1: new URL('../../assets/img/sys_6.png', import.meta.url),
     img2: new URL('../../assets/img/sys_6.png', import.meta.url),
-}])
+}
+])
 const showChangeLan = ref(false)  //是否显示选择语言弹框
 const currentLanguage = ref(useStore.customSetting.basic.language)  //当前的语言
 const showTapApk = ref(false)  //是否显示跳转apk
@@ -59,28 +65,19 @@ const showchangePass = ref(false)//是否显示更改密码
 const password1 = ref() //原密码
 const password2 = ref() //新密码
 const password3 = ref() //确认新密码
-//loading框
-const showLoading = () => {
-    Loading.show({
-        color: '#83A9FF',
-        backgroundColor: '#ffffff',
-        opacity: 0,
-        zIndex: 9999,
-    });
-}
 //控制只能输入四个
 const setinput = (e: number) => {
     if (e == 1) {
-        if (String(password1.value).length > 4) {
-            password1.value = String(password1.value).slice(0, 4)
+        if (String(password1.value).length > 10) {
+            password1.value = String(password1.value).slice(0, 10)
         }
     } else if (e == 2) {
-        if (String(password2.value).length > 4) {
-            password2.value = String(password2.value).slice(0, 4)
+        if (String(password2.value).length > 10) {
+            password2.value = String(password2.value).slice(0, 10)
         }
     } else if (e == 3) {
-        if (String(password3.value).length > 4) {
-            password3.value = String(password3.value).slice(0, 4)
+        if (String(password3.value).length > 10) {
+            password3.value = String(password3.value).slice(0, 10)
         }
     }
 
@@ -95,27 +92,24 @@ const tapChangepass = () => {
 //确认修改密码
 const Changepassword = () => {
     if (password1.value && password2.value && password3.value) {
-        if (String(password1.value).length == 4 && String(password2.value).length == 4 && String(password3.value).length == 4) {
-            if (password1.value == useStore.customSetting.basic.adminPass) {
-                if (password2.value == password3.value) {
-                    if (password1.value !== password2.value) {
-                        useStore.$patch((state: any) => {
-                            state.customSetting.basic.adminPass = password2.value
-                        })
-                        tapChangepass()
-                        toast.show('修改成功')
-                    } else {
-                        toast.show('新密码与原密码相同')
-                    }
+        if (password1.value == useStore.customSetting.basic.adminPass) {
+            if (password2.value == password3.value) {
+                if (password1.value !== password2.value) {
+                    useStore.$patch((state: any) => {
+                        state.customSetting.basic.adminPass = password2.value
+                    })
+                    tapChangepass()
+                    toast.show('修改成功')
                 } else {
-                    toast.show('两次输入密码不相同')
+                    toast.show('新密码与原密码相同')
                 }
             } else {
-                toast.show('原密码不正确')
+                toast.show('两次输入密码不相同')
             }
         } else {
-            toast.show('密码格式不正确')
+            toast.show('原密码不正确')
         }
+
     } else {
         toast.show('请完善更改内容')
     }
@@ -147,23 +141,23 @@ const Setlanguage = (e: any) => {
 const ModelClick = (e: number) => {
     if (e == 1) {
         //点击自动模式
-        showLoading()
+        ControlLoading(true)
         settingUtil.autoModel().then(() => {
-            Loading.hide()
+            ControlLoading(false)
         })
     } else if (e == 2) {
         // 点击手动模式
-        showLoading()
+        ControlLoading(true)
         settingUtil.manualModel().then(() => {
-            Loading.hide()
+            ControlLoading(false)
         })
     } else if (e == 3) {
         //点击重启App
         console.log('重启App')
-        // settingUtil.restart()
+        settingUtil.restart()
     } else if (e == 4) {
         //点击充电桩复位
-        showLoading()
+        ControlLoading(true)
         if (!useStore.customSetting.basic.char) {
             useStore.$patch((state: any) => {
                 state.customSetting.basic.char = ChargingPileList[0].id
@@ -172,16 +166,20 @@ const ModelClick = (e: number) => {
         for (let item of ChargingPileList) {
             if (useStore.customSetting.basic.char == item.id) {
                 return settingUtil.setPos(item).then(() => {
-                    Loading.hide()
+                    ControlLoading(false)
                 })
             }
         }
     } else if (e == 5) {
         //点击系统设置
         console.log('系统设置')
+        OpenSetting()
     } else if (e == 6) {
         //点击WLAN
         console.log('WLAN')
+        // router.push({
+        //     path: '/WifeSetting'
+        // })
     }
 }
 </script>
@@ -247,10 +245,10 @@ const ModelClick = (e: number) => {
         </div> -->
         <div class="sys_message">
             <div class="sys_message_top font4">系统信息</div>
-            <div class="sys_onemessage">
+            <!-- <div class="sys_onemessage">
                 <div>机器人类型</div>
                 <div>R1餐厅机器人</div>
-            </div>
+            </div> -->
 
             <div class="sys_onemessage">
                 <div>机器人SN</div>
@@ -259,16 +257,16 @@ const ModelClick = (e: number) => {
 
             <div class="sys_onemessage">
                 <div>机器人版本</div>
-                <div>1.7.x</div>
-            </div>
-            <div class="sys_onemessage">
-                <div>机器人底盘版本</div>
-                <div>1.1.1</div>
+                <div>{{H5Version}} ({{CurrentappVersion.split(',')[1]}})</div>
             </div>
             <div class="sys_onemessage noborder">
+                <div>机器人底盘版本</div>
+                <div>{{useStore.vers}}</div>
+            </div>
+            <!-- <div class="sys_onemessage noborder">
                 <div>机器人部署时间</div>
                 <div>2022-01-11</div>
-            </div>
+            </div> -->
         </div>
         <div class="emptyline"></div>
         <div class="mask_tapapk" v-if="showTapApk">

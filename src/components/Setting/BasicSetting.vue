@@ -4,7 +4,7 @@ import { onMounted, onUnmounted, reactive, ref } from 'vue';
 import store from "../../store";
 import BaseSettingtank from './component/BaseSettingtank.vue';
 import { StandbyPoint, ChargingPile } from '../../js/Datacollation'
-import { taskUtil } from '../../js/taskUtil';
+import { robotUtil } from '../../js/robotUtil';
 import settingUtil from '../../js/settingUtil';
 const useStore: any = store()
 let pointList: any = reactive({
@@ -120,6 +120,14 @@ for (var i of pointList.StandbyPointList) {
         break
     }
 }
+//设置里的站点如果不存在
+if (!standbyname.value) {
+    Defaultstandby.value = pointList.StandbyPointList[0].id
+    useStore.$patch((state: any) => {
+        state.customSetting.basic.standby = pointList.StandbyPointList[0].id
+    })
+    standbyname.value = pointList.StandbyPointList[0].name
+}
 
 
 const Defaultcharplie = ref(0) //默认充电桩
@@ -139,6 +147,14 @@ for (var i of pointList.ChargingPileList) {
     }
 }
 
+//设置里的站点如果不存在
+if (!charname.value) {
+    Defaultcharplie.value = pointList.ChargingPileList[0].id
+    useStore.$patch((state: any) => {
+        state.customSetting.basic.char = pointList.ChargingPileList[0].id
+    })
+    charname.value = pointList.ChargingPileList[0].name
+}
 
 
 //修改默认tab
@@ -207,18 +223,11 @@ const ChangeChar = (e: number) => {
     controlType.value = 0
 }
 
+//回充电桩
 const gochargepile = () => {
-    //去充电
-    if (taskUtil.goCheck() != true) {
-        alert('需要复位')
-        return false;
-    }
-    if (useStore.robotstate.isManualMode != false) {
-        alert('请开启自动模式')
-        return false;
-    }
-    console.log(settingUtil.getChargeStation())
+    settingUtil.goCharpile(settingUtil.getChargeStation())
 }
+
 
 </script>
 <template>

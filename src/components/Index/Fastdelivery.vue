@@ -1,9 +1,8 @@
 
 <script lang="ts">
 import { defineComponent } from 'vue';
-import { ActionType } from "@autoxing/robot-js-sdk/index.js";
-import { globalData } from "../../js/globalData"
 import { audioMode } from "../../js/globalConfig"
+import { toast } from '../Toast/Toast';
 export default defineComponent({
     beforeRouteEnter(to, from, next) {
         next((vm) => {
@@ -11,18 +10,41 @@ export default defineComponent({
             if (from.matched[0].path == '/setting') {
                 instance.setpallent()
             }
+            //通过修改任务返回的主页
+            if (instance.userstore.isModify) {
+                taskInfo.pallet.forEach((item: any, index: number) => {
+                    if (item.status == 3) {
+                        instance.delectcurrent(instance.pallet[index])
+                    }
+                });
+            } else {
+                //完成任务或者取消等返回首页 就清空选中内容
+                if (from.fullPath == '/task') {
+                    for (let i in instance.pallet) {
+                        if (instance.pallet[i].table) {
+                            instance.delectcurrent(instance.pallet[i])
+                        }
+                    }
+                    for (let obj of instance.pallet) {
+                        obj.sel = false
+                    }
+                    instance.pallet[0].sel = true
+
+                }
+            }
         });
     },
 });
 </script>
 <script setup lang="ts">
-import { ref, reactive, } from 'vue'
+import { ref, reactive, nextTick, onMounted } from 'vue'
 import 'swiper/css';
 import { Swiper, SwiperSlide } from 'swiper/vue';
-import { tables } from '../../js/Datacollation'
+import { tables, poiMap, EffectivFloor, currentfloor } from '../../js/Datacollation'
 import store from '../../store';
-import { taskUtil } from '../../js/taskUtil';
+import { robotUtil, taskInfo } from '../../js/robotUtil';
 import settingUtil from "../../js/settingUtil"
+
 
 const userstore: any = store()
 const currentType = ref(1) //当前是餐桌还是包间
@@ -56,6 +78,7 @@ const ficpallet: any = reactive([
         show: true
     }
 ])
+
 const pallet: any = reactive([])
 //设置左侧托盘展示
 function setpallent() {
@@ -115,6 +138,7 @@ function onSlideChange2(e: any) {
     tabMessage.swipertab2 = e.activeIndex
     computeFloor()
 }
+
 //获取餐厅swiper对象方法
 function onSwiper(e: any) {
     curSwiper = e
@@ -123,6 +147,7 @@ function onSwiper(e: any) {
 function onSwiper2(e: any) {
     curSwiper2 = e
 }
+
 //swiper上一页
 function swiperPrev() {
     currentType.value == 1 ? curSwiper.slidePrev() : curSwiper2.slidePrev()
@@ -131,6 +156,7 @@ function swiperPrev() {
 function swiperNext() {
     currentType.value == 1 ? curSwiper.slideNext() : curSwiper2.slideNext()
 }
+
 //楼层点击  swiper切换至对应位
 function floorTap(item: any) {
     if (currentType.value == 1) {
@@ -212,14 +238,26 @@ function lightcalculation(arr: any) {
     }
     return lights;
 }
+//背景声音数据
+function volumeculation(e: any) {
+    let currentcast = null
+    let broadcasts = poiMap[2 + ""]  //2==配送
+    if (broadcasts[e + ""] != undefined) {
+        currentcast = broadcasts[e + ""]
+    }
+    let Fobj: any = {
+        mode: audioMode,
+        audioId: "3111002",//您的餐到了
+        url: currentcast ? currentcast.fileUrl : null,
+        volume: userstore.customSetting.sound.switchon ? userstore.customSetting.sound.voiceVolume : 0,
+        interval: currentcast ? currentcast.ruleInterval : -1,
+        duration: currentcast ? currentcast.ruleDuration : -1,
+    }
+    return Fobj
+}
 
 //去任务
 function goTask() {
-    // console.log("检查可执行性");
-    // if (taskUtil.goCheck() == false) {
-    //     return;
-    // }
-
     let list = []
     let palletmap: any = {} //站点与托盘的一对多关系
     for (let i = 0; i < pallet.length; i++) {
@@ -237,6 +275,7 @@ function goTask() {
             } else {
                 palletmap[obj.id + ""].push(i)
             }
+
             if (exist == false) {
                 list.push(obj)
             }
@@ -246,48 +285,45 @@ function goTask() {
     let pts = [];
     for (let i = 0; i < list.length; i++) {
         let poi = list[i]
-        pts.push({
-            x: poi.coordinate[0],
-            y: poi.coordinate[1],
-            yaw: poi.yaw,
-            ext: {
-                name: poi.name,
-                id: poi.id,
-                idx: palletmap[poi.id + ""], //在哪几层托盘
-                len: pallet.length //托盘总层数
-            },
-            stepActs: [
-                {
-                    type: 5,//本地音频
-                    data: {
-                        mode: audioMode,
-                        audioId: "3111002",//您的餐到了
-                        // url: "https://autoxingtest1.oss-cn-beijing.aliyuncs.com/mp3/autoxing/beijingtalk01.mp3", num: 1,
-                        volume: 50,
-                        interval: -1,
-                        duration: -1
+        pts.push(
+            {
+                x: poi.coordinate[0],
+                y: poi.coordinate[1],
+                yaw: poi.yaw,
+                ext: {
+                    name: poi.name,
+                    id: poi.id,
+                    areaId: poi.areaId,
+                    idx: palletmap[poi.id + ""],
+                    len: pallet.length
+                },
+                stepActs: [
+                    {
+                        type: 5,//本地音频
+                        data: volumeculation(poi.id)
                     },
-                },
-                {
-                    type: 37, //灯带控制
-                    data: {
-                        mode: 1,//"color":1, //颜色  1红色 3绿色 4蓝色 5黄色 
-                        color: 1,
-                        indexs: lightcalculation(palletmap[poi.id + ""]),
-                    }
-                },
-                {
-                    type: 40
-                },
-                {
-                    type: 38,
-                    data: {
-                        mode: 1,
-                        color: 4
-                    }
-                },
-            ],
-        });
+                    {
+                        type: 37, //灯带控制
+                        data: {
+                            mode: 1,//"color":1, //颜色  1红色 3绿色 4蓝色 5黄色 
+                            color: 1,
+                            indexs: lightcalculation(palletmap[poi.id + ""]),
+                        }
+                    },
+                    //等待交互
+                    {
+                        type: 40
+                    },
+                    //关闭灯带
+                    {
+                        type: 38,
+                        data: {
+                            mode: 1,
+                            color: 4
+                        }
+                    },
+                ],
+            });
     }
 
     if (pts.length > 0) {
@@ -299,9 +335,9 @@ function goTask() {
             ext: {
                 name: "返航中",//standby.name,
                 id: standby.id,
+                areaId: standby.areaId
             },
-            stepActs: [
-            ],
+            stepActs: [],
         }
 
         let curPt = {
@@ -310,16 +346,35 @@ function goTask() {
             },
             stepActs: [
                 {
-                    type: 5,//
+                    type: 5,//本地音频
                     data: {
                         mode: audioMode,
                         audioId: "3111012",//"小舟要出发送餐了，请让一让"
                         num: 1,
-                        volume: 50,
+                        volume: userstore.customSetting.sound.switchon ? userstore.customSetting.sound.voiceVolume : 0,
                         interval: -1,
-                        duration: -1
+                        duration: -1,
+                        channel: 1
                     },
-                }
+                },
+                {
+                    type: 5,//背景音乐
+                    data: {
+                        mode: audioMode,
+                        audioId: settingUtil.getbackgroundSong(),
+                        num: 999,
+                        volume: userstore.customSetting.sound.switchon ? userstore.customSetting.sound.voiceVolume : 0,
+                        interval: -1,
+                        duration: -1,
+                        channel: 2
+                    },
+                },
+                {
+                    type: 41,  //设置速度
+                    data: {
+                        speed: userstore.customSetting.delivery.runSpeed / 100
+                    }
+                },
             ],
         }
 
@@ -332,20 +387,33 @@ function goTask() {
             pts: pts,
             backPt: backPt
         };
-        console.log("发送任务", task);
-        taskUtil.startTask(task).then((res: any) => {
-            console.log(res);
-        }).catch((e: any) => {
-            console.log(e);
-        })
+        robotUtil.startTask(task)
     } else {
-        console.log("未选择站点");
+        toast.show('未选择站点')
     }
 }
-defineExpose({ pallet, setpallent });
+// for (let i in EffectivFloor) {
+//     if (currentfloor == EffectivFloor[i]) {
+//         console.log(i)
+//         if (Number(i) > 3) {
+//             tabMessage.floorlist1scroll = true
+//             nextTick(function () {
+//                 var element1 = document.getElementById("id" + (Number(i) + Number(1)))
+//                 console.log(element1, "element")
+//                 if (element1) {
+//                     element1.scrollIntoView({ block: 'start', behavior: "smooth" });
+//                 }
+//             })
+
+//         }
+//     }
+// }
+
+defineExpose({ pallet, setpallent, delectcurrent, userstore, revise });
 </script>
 
 <template>
+
     <div class="content">
         <div class="index_left">
             <div class="index_left_top">
@@ -367,7 +435,7 @@ defineExpose({ pallet, setpallent });
                 <div class="layer5"></div>
             </div>
         </div>
-        <div class="index_right">
+        <div class="index_right" id="floorid">
             <div class="index_right_top">
                 <!-- 餐厅的楼层循环选择 begin-->
                 <div class="floor_content" v-if="currentType == 1">
@@ -378,7 +446,8 @@ defineExpose({ pallet, setpallent });
                     </div>
                     <div class="floor_list2" v-if="floorlist1.length > 4 && tabMessage.floorlist1scroll">
                         <div :class="item.sel ? 'one_floor' : 'nosel_floor'" v-for="(item, index) in floorlist1"
-                            @click="floorTap(item.name)" :key="index">{{ item.name }}</div>
+                            @click="floorTap(item.name)" :key="index">{{ item.name
+                            }}</div>
                     </div>
                     <div class="more" v-if="floorlist1.length > 4 && !tabMessage.floorlist1scroll"
                         @click="showMorefloor()">更多</div>
@@ -394,7 +463,8 @@ defineExpose({ pallet, setpallent });
                     </div>
                     <div class="floor_list2" v-if="floorlist2.length > 4 && tabMessage.floorlist2scroll">
                         <div :class="item.sel ? 'one_floor' : 'nosel_floor'" v-for="(item, index) in floorlist2"
-                            @click="floorTap(item.name)" :key="index">{{ item.name }}</div>
+                            @click="floorTap(item.name)" :key="index">{{ item.name
+                            }}</div>
                     </div>
                     <div class="more" v-if="floorlist2.length > 4 && !tabMessage.floorlist2scroll"
                         @click="showMorefloor()">更多</div>
@@ -410,11 +480,13 @@ defineExpose({ pallet, setpallent });
                 </div>
             </div>
             <!-- 餐厅点位循环 start -->
-            <div class="index_right_center" v-if="currentType == 1">
+            <div class="index_right_center">
                 <div class="left_pre">
-                    <span @click="swiperPrev()" class="swiper-button-prev"></span>
+                    <span @click="swiperPrev" class="swiper-button-prev"></span>
                 </div>
-                <div class="left_center">
+
+                <!-- 餐桌点位选择 start-->
+                <div class="left_center" v-if="currentType == 1">
                     <div class="swiper_content">
                         <swiper :initialSlide='tabMessage.swipertab' :slides-per-view="1" :space-between="50"
                             @swiper="onSwiper" @slideChange="onSlideChange">
@@ -426,34 +498,15 @@ defineExpose({ pallet, setpallent });
                                 </div>
                             </swiper-slide>
                         </swiper>
-
-                    </div>
-                    <div class="dots">
-                        <div class="dotscontent">
-                            <div v-for="(item, index) in tabMessage.boardlist"
-                                :class="index == tabMessage.swipertab ? 'one_dot' : 'one_dot2'">
-                            </div>
-                        </div>
                     </div>
                 </div>
-                <div class="right_pre">
-                    <span @click="swiperNext()" class="swiper-button-next"></span>
-                </div>
-            </div>
-            <!-- 餐厅点位循环 end -->
+                <!-- 餐桌选择 end-->
 
-
-
-
-            <!-- 包间点位循环 start -->
-            <div class="index_right_center" v-if="currentType == 2">
-                <div class="left_pre">
-                    <span @click="swiperPrev()" class="swiper-button-prev"></span>
-                </div>
-                <div class="left_center">
+                <!-- 包间点位选择 start-->
+                <div class="left_center" v-if="currentType == 2">
                     <div class="swiper_content">
-                        <swiper :initialSlide='tabMessage.swipertab2' :slides-per-view="1" :space-between="50"
-                            @swiper="onSwiper2" @slideChange="onSlideChange2">
+                        <swiper style="width: 100%;height: 100%;" :initialSlide='tabMessage.swipertab2'
+                            :slides-per-view="1" :space-between="50" @swiper="onSwiper2" @slideChange="onSlideChange2">
                             <swiper-slide v-for="(item, index) in tabMessage.boardlist2" :key="index" class="slideone">
                                 <div v-for="(item2, index2) in item" :key="index2"
                                     :class="item2.select == 1 ? 'one_Point font1' : 'one_Point2 font1'"
@@ -462,22 +515,18 @@ defineExpose({ pallet, setpallent });
                                 </div>
                             </swiper-slide>
                         </swiper>
-
-                    </div>
-                    <div class="dots">
-                        <div class="dotscontent">
-                            <div v-for="(item, index) in tabMessage.boardlist2"
-                                :class="index == tabMessage.swipertab2 ? 'one_dot' : 'one_dot2'">
-                            </div>
-                        </div>
                     </div>
                 </div>
                 <div class="right_pre">
-                    <span @click="swiperNext()" class="swiper-button-next"></span>
+                    <span @click="swiperNext" class="swiper-button-next"></span>
                 </div>
             </div>
-            <!-- 包间点位循环 end -->
-            <div class="index_right_bottom font1" @click="goTask">立即出发</div>
+
+
+            <div class="index_right_bottom font1" @click="goTask">
+                <span v-if="userstore.isModify">修改任务</span>
+                <span v-else>立即出发</span>
+            </div>
         </div>
     </div>
 </template>

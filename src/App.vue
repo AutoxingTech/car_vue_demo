@@ -9,7 +9,7 @@ const button = document.getElementById('app') as HTMLButtonElement;
 button.setAttribute("class", "theme_0");
 onMounted(() => {
   const win: any = window
-  if (win.app) {
+  if (win.apk) {
     setWin(win)
     //车机访问 
   } else {

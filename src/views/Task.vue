@@ -1,26 +1,44 @@
 <script setup lang="ts">
 import router from '../router';
-import { taskUtil, taskInfo } from '../js/taskUtil';
-import { onMounted, reactive, ref } from 'vue';
-
+import { robotUtil, taskInfo } from '../js/robotUtil';
+import { CrashStatus } from '../js/globalData'
+import { onMounted, reactive, ref, watch } from 'vue';
+import store from '../store';
+import { onBeforeRouteLeave } from 'vue-router';
+import path from 'path';
+import { downloadStatus, compress, installApk } from '../js/android';
+const userStore: any = store()
 const task = taskInfo
 const takeMeal = ref(false)
 const isPause = ref(false)
-
+const cruiseStop = ref(false)
+const getcurrentearly = ref(false)
 let currentTaskIndex = 0
+let countdownTimeout: any = ''  //倒计时
+let pauseshowtime = ref(0)
+let getearly_pausetime = ref(0)
+let curise_pausetime = ref(0)
+//14出发 16到达 到达状态巡游不需要暂停，临时解决 
+//sdk暂停状态 暂停无效也怕时间差寸交互不及时
+let cruisePauseAble = 0
 
 function setCurrentTask(t: any) {
     task.currentTask = t
 }
 
 function UICallBack(tag: number) {
-    console.log("UICallBack", tag)
+    console.log("==============UICallBack==========", tag)
     switch (tag) {
         case 14: {//前往
+            cruisePauseAble = 14
             updateCurrentTaskIndex()
         }
             break;
         case 16: {//到达
+            cruisePauseAble = 16
+        }
+            break;
+        case 40: {//到达
             takeMeal.value = true
         }
             break;
@@ -33,9 +51,17 @@ function UICallBack(tag: number) {
 
 onMounted(() => {
     console.log("onMounted")
-    taskUtil.setUICallBack(UICallBack)
+    robotUtil.setUICallBack(UICallBack)
     currentTaskIndex = 0
     updateCurrentTaskIndex()
+
+    watch(() => CrashStatus.value,
+        (newvalue, oldvalue) => {
+            if (newvalue == 1) {
+                goonTask()
+            }
+        }
+    );
 })
 
 //更新当前显示的正在配送任务
@@ -77,41 +103,51 @@ function updateCurrentTaskIndex() {
 
 //暂停/继续
 function pause() {
+    console.log(taskInfo.runType, cruisePauseAble)
+    clearTimeout(countdownTimeout)
     if (taskInfo.runType == 20 || taskInfo.runType == 21) {
         if (isPause.value) {
-            taskUtil.resumeMotion().then(() => {
+            robotUtil.resumeMotion().then(() => {
                 updateCurrentTaskIndex()
                 isPause.value = !isPause.value
-            }).catch((e: any) => {
-                console.log(e)
             })
         } else {
-            taskUtil.pauseTask().then(() => {
+            robotUtil.pauseTask().then(() => {
                 isPause.value = !isPause.value
-            }).catch((e: any) => {
-                console.log(e)
+                TimeoutSet(0)
             })
+        }
+    } else if (taskInfo.runType == 23) {
+        //巡游暂停
+        if (cruisePauseAble == 16) {
+            return
+        } else {
+            if (cruiseStop.value) {
+                robotUtil.resumeMotion().then(() => {
+                    cruiseStop.value = !cruiseStop.value
+                })
+            } else {
+                robotUtil.pauseTask().then(() => {
+                    cruiseStop.value = !cruiseStop.value
+                    TimeoutSet_Curise(0)
+                })
+            }
         }
     }
 }
 
 //取消任务
 function cancelTask() {
-    taskUtil.cancelTask().then(() => {
-
-    }).catch((e: any) => {
-        console.log(e)
-    })
+    clearTimeout(countdownTimeout)
+    robotUtil.cancelTask()
 }
 
 //取餐
 function takeAway(item: any) {
     item.status = 3
-    taskUtil.continueTask().then(() => {
+    robotUtil.continueTask().then(() => {
         updateCurrentTaskIndex()
         takeMeal.value = false
-    }).catch((e: any) => {
-        console.log(e)
     })
 }
 
@@ -124,25 +160,43 @@ function preGet(item: any) {
             break;
         }
     }
-    taskUtil.updateTask([{ index: idx, isPass: true }]).then((res: any) => {
-        console.log("__________", res)
+    robotUtil.updateTask([{ index: idx, isPass: true }]).then((res: any) => {
         item.status = 3
-    }).catch((e: any) => {
-        console.log(e)
     })
 }
 
+//点击当前提前取
 function preGetCurrent() {
+    clearTimeout(countdownTimeout)
     console.log("preGetCurrent")
+    robotUtil.pauseTask().then(() => {
+        getcurrentearly.value = true
+        TimeoutSet_getEary(0)
+    })
+}
+
+//取消提前取餐
+function Cancle_getEarly() {
+    clearTimeout(countdownTimeout)
+    robotUtil.resumeMotion().then(() => {
+        updateCurrentTaskIndex()
+        getcurrentearly.value = false
+    })
+}
+
+
+//确定提前取
+function getEarly() {
+    clearTimeout(countdownTimeout)
     for (let i = 0; i < task.list.length; i++) {
         let item = task.list[i]
-        console.log(item)
         if (item.status == 1) { //todo 需要改id
-            taskUtil.updateTask([{ index: i, isPass: true }]).then(() => {
+            robotUtil.updateTask([{ index: i, isPass: true }]).then(() => {
                 item.status = 3
-                updateCurrentTaskIndex()
-            }).catch((e: any) => {
-                console.log(e)
+                robotUtil.resumeMotion().then(() => {
+                    updateCurrentTaskIndex()
+                    getcurrentearly.value = false
+                })
             })
             break;
         }
@@ -150,14 +204,19 @@ function preGetCurrent() {
 }
 
 
+
+
 function navCrashstop() {
-    taskUtil.emergencyStop()
+    robotUtil.emergencyStop()
 }
 
 function navIndex() {
     takeMeal.value = false
     isPause.value = false
-    router.go(-1)
+
+    if (router.currentRoute.value.path == '/task') {
+        router.back()
+    }
 }
 
 function getcolor(status: any) {
@@ -180,6 +239,80 @@ function getTakeMelcalss(status: any) {
     }
 }
 
+function TimeoutSet(e: number) {
+    let pauseTime = userStore.customSetting.delivery.pauseDuration
+    let i = e
+    countdownTimeout = setTimeout(() => {
+        i += 1
+        if (i == pauseTime) {
+            //继续任务
+            pause()
+        } else {
+            TimeoutSet(i)
+        }
+    }, 1000)
+    pauseshowtime.value = pauseTime - i
+}
+//点击提前取餐开始倒计时
+function TimeoutSet_getEary(e: number) {
+    let pauseTime = userStore.customSetting.delivery.pauseDuration
+    let i = e
+    countdownTimeout = setTimeout(() => {
+        i += 1
+        if (i == pauseTime) {
+            pause()
+        } else {
+            TimeoutSet_getEary(i)
+        }
+    }, 1000)
+    getearly_pausetime.value = pauseTime - i
+}
+
+
+//点击巡游暂停开始倒计时
+function TimeoutSet_Curise(e: number) {
+    let pauseTime = userStore.customSetting.delivery.pauseDuration
+    let i = e
+    countdownTimeout = setTimeout(() => {
+        i += 1
+        if (i == pauseTime) {
+            pause()
+        } else {
+            TimeoutSet_Curise(i)
+        }
+    }, 1000)
+    curise_pausetime.value = pauseTime - i
+}
+
+
+//修改任务
+function ModifyTask() {
+    //标记为修改任务状态
+    userStore.$patch((state: any) => {
+        state.isModify = true
+        clearTimeout(countdownTimeout)
+        console.log("结束当前任务")
+        robotUtil.cancelTask()
+    })
+}
+
+//继续任务
+function goonTask() {
+    if (!takeMeal) {
+        robotUtil.resumeMotion()
+        robotUtil.continueTask()
+    }
+}
+
+
+//离开页面
+onBeforeRouteLeave(() => {
+    console.log("离开页面清除倒计时")
+    clearTimeout(countdownTimeout)
+    isPause.value = false
+    cruiseStop.value = false
+
+})
 </script>
 
 <template>
@@ -194,8 +327,18 @@ function getTakeMelcalss(status: any) {
 
     <!-- 任务中画面 -->
     <div class="task_content" @click="pause" v-if="!isPause">
-        <div class="center_table">{{task.currentTask.name}}</div>
+        <div class="center_table" v-if="task.runType!==23">{{task.currentTask.name}}</div>
+        <div class="center_table" v-if="task.runType==23&&cruiseStop==false">巡游中</div>
+        <div class="center_table" v-if="task.runType==23&&cruiseStop==true">巡游已暂停</div>
+
         <div v-if="task.runType==20||task.runType==21" class="center_give">送餐中</div>
+
+        <div v-if="task.runType==23&&cruiseStop==true" class="center_give" style="bottom:140px">
+            <div>暂停巡游任务中</div>
+            <div>点击屏幕继续巡游</div>
+            <div style="color: #ED8037;">倒数计时中({{curise_pausetime}}s)</div>
+        </div>
+
         <img src="../assets/img/taskcircle.png" style="height: 100%;width: 100%;position: absolute;">
         <img src="../assets/img/taskcircle2.png" style="height: 100%;width: 100%;z-index: 1;position: absolute;">
         <img src="../assets/img/taskcircle3.png" class="centercircle">
@@ -208,6 +351,33 @@ function getTakeMelcalss(status: any) {
         <!-- 提前取 -->
         <img src="../assets/img/earyget.jpg" />
     </div>
+
+
+    <div class="curise_mode" v-if="task.runType==23&&cruiseStop==true">
+        <div class="mode_right" @click="cancelTask">
+            <div>
+                <img src="../assets/img/taskr2.png" style="width:100%;height: 100%;">
+            </div>
+            <div class="font8">结束任务</div>
+        </div>
+    </div>
+
+    <!-- //提前取餐的弹框 -->
+    <div class="early_gettank" v-if="getcurrentearly==true">
+        <div class="earlycenter">
+            <div class="imgcenter">
+                <img src="../assets/img/eary_getmeal.png" style="width:100%;height: 100%;">
+            </div>
+            <div class="overtime">
+                是否完成操作
+            </div>
+
+            <div class="bot-button">
+                <div @click="Cancle_getEarly">取消</div>
+                <div @click="getEarly">完成（{{getearly_pausetime}}s）</div>
+            </div>
+        </div>
+    </div>
     <!-- 任务中画面 -->
 
 
@@ -217,10 +387,10 @@ function getTakeMelcalss(status: any) {
             <div class="leftdevery" @click="pause">
                 <div class="annicont">
                     <div class="ondeliveryable">{{task.currentTask.name}}</div>
-                    <div v-if="task.runType==20||task.runType==21" class="deliverytip">
+                    <div v-if="task.runType==20||task.runType==21" class="deliverytip font9">
                         <div>暂停任务中</div>
                         <div>点击屏幕继续配送</div>
-                        <div>倒数计时中(58s)</div>
+                        <div>倒数计时中({{pauseshowtime}}s)</div>
                     </div>
                     <img src="../assets/img/taskcircle.png" style="height: 100%;width: 100%;position: absolute;">
                     <img src="../assets/img/taskcircle2.png"
@@ -240,10 +410,12 @@ function getTakeMelcalss(status: any) {
                                     <div class="one_cont"
                                         :style="'border-bottom: 4px solid '+getcolor(item.status)+'!important'">
                                         <div :style="'color:'+getcolor(item.status)+''">L{{index+1}}：</div>
-                                        <div :style="'color:'+getcolor(item.status)+''">{{item.name}}</div>
+                                        <div :style="'color:'+getcolor(item.status)+''" class="font8">{{item.name}}
+                                        </div>
                                     </div>
                                 </div>
-                                <div @click="preGet(item)" class="bottom_Co" v-if="item.status==0||item.status==1">提前取
+                                <div @click="preGet(item)" class="bottom_Co font8"
+                                    v-if="item.status==0||item.status==1">提前取
                                 </div>
                             </div>
                         </div>
@@ -251,11 +423,11 @@ function getTakeMelcalss(status: any) {
                 </div>
 
                 <div class="delivery_bottom">
-                    <div class="bottom1">
+                    <div class="bottom1 font8" @click="ModifyTask">
                         <img src="../assets/img/taskr1.png" alt="">
                         修改任务
                     </div>
-                    <div class="bottom2" @click="cancelTask">
+                    <div class="bottom2 font8" @click="cancelTask">
                         <img src="../assets/img/taskr2.png" alt="">
                         结束任务
                     </div>
@@ -478,7 +650,7 @@ function getTakeMelcalss(status: any) {
 }
 
 .delivery_list {
-    height: 514px;
+    height: 493.5px;
     width: 100%;
     border: 3px solid #C4D6FF;
     border-radius: 20px 20px 38px 38px;
@@ -486,12 +658,12 @@ function getTakeMelcalss(status: any) {
 }
 
 .topmess {
-    height: 66px;
+    height: 63.4px;
     margin-left: 31px;
     font-size: 30px;
     font-weight: bold;
     color: #608FFA;
-    line-height: 66px;
+    line-height: 63.4px;
     position: relative;
 }
 
@@ -506,19 +678,20 @@ function getTakeMelcalss(status: any) {
 }
 
 .list_scroll {
-    max-height: 427px;
+    max-height: 410px;
     width: 331px;
-    padding: 20px 0;
+    padding: 18px 0;
     box-sizing: border-box;
     overflow-y: scroll;
 }
+
 .list_scroll::-webkit-scrollbar {
     width: 0px !important;
     height: 0px !important;
 }
 
 .one_li {
-    height: 140px;
+    height: 134.5px;
     /* display: flex;
     justify-content: space-between; */
     position: relative;
@@ -528,9 +701,9 @@ function getTakeMelcalss(status: any) {
 .lineem {
     position: absolute;
     width: 37px;
-    height: 140px;
+    height: 134.5px;
     left: 0;
-    top: 21px;
+    top: 19px;
     display: flex;
     justify-content: center;
 }
@@ -541,7 +714,7 @@ function getTakeMelcalss(status: any) {
 }
 
 .li_cont {
-    height: 42px;
+    height: 40.5px;
     width: 100%;
     display: flex;
     justify-content: space-between;
@@ -549,40 +722,40 @@ function getTakeMelcalss(status: any) {
 }
 
 .one_num {
-    width: 37px;
-    height: 37px;
+    width: 35px;
+    height: 35px;
     background-color: #6A96FB;
     border-radius: 50%;
     font-size: 23px;
     font-weight: bold;
     color: #FFFFFF;
-    line-height: 37px;
+    line-height: 35px;
     text-align: center;
     z-index: 1;
 }
 
 .one_num2 {
-    width: 37px;
-    height: 37px;
+    width: 35px;
+    height: 35px;
     background-color: #ED8037;
     border-radius: 50%;
     font-size: 23px;
     font-weight: bold;
     color: #FFFFFF;
-    line-height: 37px;
+    line-height: 35px;
     text-align: center;
     z-index: 1;
 }
 
 .one_cont {
-    height: 42px;
+    height: 40.5px;
     width: 259px;
     border-bottom: 4px solid #C4D6FF;
     font-size: 30px;
     text-align: center;
     font-weight: bold;
     color: #999999;
-    line-height: 42px;
+    line-height: 40.5px;
     display: flex;
     align-items: center;
 
@@ -595,13 +768,13 @@ function getTakeMelcalss(status: any) {
 }
 
 .bottom_Co {
-    height: 60px;
+    height: 57.5px;
     width: 201px;
     background-color: #C4D6FF;
     font-size: 23px;
     font-weight: bold;
     color: #6A96FB;
-    line-height: 60px;
+    line-height: 57.5px;
     text-align: center;
     margin-left: 93px;
     margin-top: 10px;
@@ -611,19 +784,19 @@ function getTakeMelcalss(status: any) {
 }
 
 .delivery_bottom {
-    height: 120px;
+    height: 117px;
     width: 100%;
     border: 3px solid #C4D6FF;
     border-radius: 38px 38px 20px 20px;
     box-sizing: border-box;
-    margin-top: 10px;
+    margin-top: 9px;
     display: flex;
     align-items: center;
 }
 
 .delivery_bottom>div {
     flex: 1;
-    height: 87px;
+    height: 85px;
     display: flex;
     align-items: center;
     flex-direction: column;
@@ -637,15 +810,15 @@ function getTakeMelcalss(status: any) {
 }
 
 .bottom1>img {
-    height: 50px;
-    width: 50px;
+    height: 49px;
+    width: 49px;
     margin-bottom: 5px;
 
 }
 
 .bottom2>img {
-    height: 50px;
-    width: 50px;
+    height: 49px;
+    width: 49px;
     margin-bottom: 5px;
 
 }
@@ -864,5 +1037,116 @@ function getTakeMelcalss(status: any) {
     font-weight: bold;
     color: white;
     margin-top: 100px;
+}
+
+.early_gettank {
+    position: fixed;
+    top: 0;
+    right: 0;
+    left: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999999;
+
+}
+
+.earlycenter {
+    width: 613px;
+    height: 378px;
+    border-radius: 25px;
+    background: #FFFFFF;
+
+}
+
+.imgcenter {
+    width: 154px;
+    height: 154px;
+    margin: 0 auto;
+    margin-top: 50px;
+
+}
+
+.overtime {
+    font-size: 26px;
+    font-weight: bold;
+    color: #333333;
+    width: 100%;
+    text-align: center;
+    margin-top: 10px;
+}
+
+.bot-button {
+    height: 57px;
+    width: 540px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 auto;
+    margin-top: 40px;
+}
+
+.bot-button>div:nth-child(1) {
+    width: 250px;
+    height: 57px;
+    background: #ECECEC;
+    border-radius: 9px 9px 9px 25px;
+    font-size: 23px;
+    font-weight: bold;
+    color: #999999;
+    text-align: center;
+    line-height: 57px;
+}
+
+.bot-button>div:nth-child(2) {
+    width: 250px;
+    height: 57px;
+    background: #608FFA;
+    border-radius: 9px 9px 25px 9px;
+    font-size: 23px;
+    font-weight: bold;
+    color: white;
+    text-align: center;
+    line-height: 57px;
+}
+
+.curise_mode {
+    width: 151px;
+    height: 125px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 3px solid #C4D6FF;
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    box-sizing: border-box;
+    border-radius: 30px 30px 20px 20px;
+}
+
+
+
+.mode_right {
+    width: 100%;
+    height: 94px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+}
+
+.mode_right>div:nth-child(1) {
+    width: 51px;
+    height: 51px;
+}
+
+.mode_right>div:nth-child(2) {
+    font-size: 19px;
+    font-weight: bold;
+    color: #608FFA;
+    margin-top: 10px;
+
 }
 </style>

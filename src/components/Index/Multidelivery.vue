@@ -1,10 +1,47 @@
+<script lang="ts">
+import { defineComponent } from 'vue';
+export default defineComponent({
+    beforeRouteEnter(to, from, next) {
+        next((vm) => {
+            const instance: any = vm;
+            if (instance.userstore.isModify) {
+                console.log("取消任务，取消已完成的任务")
+                taskInfo.list.forEach((item: any, index: number) => {
+                    if (item.status == 3) {
+                        instance.Multidelist.forEach((item2: any, index2: number) => {
+                            if (item2.id == item.id) {
+                                let table = item2
+                                if (table.select == 1) {
+                                    table.select = 0
+                                    instance.Multidelist.splice(index2, 1)
+                                }
+                            }
+                        });
+                    }
+                });
+            } else {
+                //完成任务或者取消等返回首页 就清空选中内容
+                if (from.fullPath == '/task') {
+                    instance.cleanMessage()
+                }
+            }
+        });
+    },
+});
+</script>
 
 <script setup lang="ts">
 import { onMounted, ref, reactive } from 'vue'
 import 'swiper/css';
 import { Swiper, SwiperSlide } from 'swiper/vue';
 import draggable from 'vuedraggable'
-import { tables } from '../../js/Datacollation';
+import { tables, poiMap } from '../../js/Datacollation';
+import { audioMode } from "../../js/globalConfig"
+import settingUtil from "../../js/settingUtil"
+import store from '../../store';
+import { robotUtil, taskInfo } from '../../js/robotUtil'
+import { toast } from '../Toast/Toast';
+const userstore: any = store()
 const currentType = ref(1)
 const tabMessage: any = reactive(tables)[1] //快捷送餐数据   
 const floorlist1: any = tabMessage.floorlist //餐桌楼层
@@ -112,9 +149,123 @@ function cleanMessage() {
         s.select = 0
     }
 }
-function goTask() {
-    console.log(Multidelist)
+
+
+//站点语音
+function volumeculation(e: any) {
+    let currentcast = null
+    let broadcasts = poiMap[2 + ""]  //2==配送
+    if (broadcasts[e + ""] != undefined) {
+        currentcast = broadcasts[e + ""]
+    }
+    let Fobj: any = {
+        mode: audioMode,
+        audioId: "3111002",//您的餐到了
+        url: currentcast ? currentcast.fileUrl : null,
+        volume: userstore.customSetting.sound.switchon ? userstore.customSetting.sound.voiceVolume : 0,
+        interval: currentcast ? currentcast.ruleInterval : -1,
+        duration: currentcast ? currentcast.ruleDuration : -1,
+    }
+    return Fobj
 }
+
+
+function goTask() {
+    let pts = [];
+    for (let i = 0; i < Multidelist.length; i++) {
+        let poi = Multidelist[i]
+        pts.push(
+            {
+                x: poi.coordinate[0],
+                y: poi.coordinate[1],
+                yaw: poi.yaw,
+                //托盘
+                ext: {
+                    name: poi.name,
+                    id: poi.id,
+                    areaId: poi.areaId
+                },
+                stepActs: [
+                    {
+                        type: 5,//本地音频
+                        data: volumeculation(poi.id)
+                    },
+                    //等待交互
+                    {
+                        type: 40
+                    }
+                ],
+            });
+    }
+    if (pts.length > 0) {
+        let standby = settingUtil.getStandbyStation()
+        let backPt = {
+            x: standby.coordinate[0],
+            y: standby.coordinate[1],
+            yaw: standby.yaw,
+            ext: {
+                name: "返航中",//standby.name,
+                id: standby.id,
+                areaId: standby.areaId
+            },
+            stepActs: [
+            ],
+        }
+
+        let curPt = {
+            ext: {
+                name: "起点",//起点要做的事件
+            },
+            stepActs: [
+                {
+                    type: 5,//本地音频
+                    data: {
+                        mode: audioMode,
+                        audioId: "3111012",//"小舟要出发送餐了，请让一让"
+                        num: 1,
+                        volume: userstore.customSetting.sound.switchon ? userstore.customSetting.sound.voiceVolume : 0,
+                        interval: -1,
+                        duration: -1,
+                        channel: 1
+                    },
+                },
+                {
+                    type: 5,//背景音乐
+                    data: {
+                        mode: audioMode,
+                        audioId: settingUtil.getbackgroundSong(),
+                        num: 999,
+                        volume: userstore.customSetting.sound.switchon ? userstore.customSetting.sound.voiceVolume : 0,
+                        interval: -1,
+                        duration: -1,
+                        channel: 2
+                    },
+                },
+                {
+                    type: 41,  //速度设置
+                    data: {
+                        speed: userstore.customSetting.delivery.runSpeed / 100
+                    }
+                },
+            ],
+        }
+
+        let task = {
+            name: "多点任务" + new Date().getTime(),
+            runNum: 1,
+            taskType: 2,
+            runType: 21,
+            curPt: curPt,
+            pts: pts,
+            backPt: backPt
+        };
+        robotUtil.startTask(task)
+    } else {
+        toast.show('请选择站点')
+    }
+}
+
+defineExpose({ Multidelist, userstore, cleanMessage });
 </script>
 
 
@@ -251,7 +402,10 @@ function goTask() {
                 </div>
                 <div class="clean_cont" @click="cleanMessage">清空</div>
             </div>
-            <div class="mu_sel_right font1" @click="goTask">立即出发</div>
+            <div class="mu_sel_right font1" @click="goTask">
+                <span v-if="userstore.isModify">修改任务</span>
+                <span v-else>立即出发</span>
+            </div>
         </div>
 
     </div>

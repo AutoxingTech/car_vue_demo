@@ -1,13 +1,36 @@
 
+<script lang="ts">
+import { defineComponent } from 'vue';
+export default defineComponent({
+    beforeRouteEnter(to, from, next) {
+        next((vm) => {
+            const instance: any = vm;
+            if (from.fullPath == '/task') {
+                if (instance.Guidelist) {
+                    instance.Guidelist.select = 0
+                    instance.Guidelist = ''
+                }
+            }
+        })
+    }
+});
+
+</script>
+
+
 <script setup lang="ts">
 import { onMounted, ref, reactive } from 'vue'
 import 'swiper/css';
 import { Swiper, SwiperSlide } from 'swiper/vue';
-import { tables } from '../../js/Datacollation';
+import { tables, poiMap } from '../../js/Datacollation';
+import { audioMode } from "../../js/globalConfig"
+import settingUtil from '../../js/settingUtil'
+import store from '../../store'
+import { robotUtil, taskInfo } from '../../js/robotUtil';
+import { toast } from '../Toast/Toast';
+const userstore: any = store()
 const currentType = ref(1)
-console.log(tables, 'tabs')
 const tabMessage: any = reactive(tables)[2] //引领数据   
-console.log(tabMessage, "引领数据")
 const floorlist1: any = tabMessage.floorlist //餐桌楼层
 const floorlist2 = tabMessage.floorlist2  //包间楼层
 let curSwiper: any = null; //餐厅swiper的对象
@@ -85,18 +108,134 @@ function pointTap(index: number, index2: number) {
     let boardlist = currentType.value == 1 ? tabMessage.boardlist : tabMessage.boardlist2
     let table = boardlist[index][index2]
     table.select = 1
+
     if (!Guidelist.value) {
         Guidelist.value = table
     } else {
-        Guidelist.value.select = 0
-        Guidelist.value = ''
-        Guidelist.value = table
+        if (table.id == Guidelist.value.id) {
+            Guidelist.value.select = 0
+            Guidelist.value = ''
+        } else {
+            Guidelist.value.select = 0
+            Guidelist.value = ''
+            Guidelist.value = table
+        }
     }
+}
+
+//站点语音
+function volumeculation(e: any) {
+    let currentcast = null
+    let broadcasts = poiMap[3 + ""]  //3==引领
+    if (broadcasts[e + ""] != undefined) {
+        currentcast = broadcasts[e + ""]
+    }
+    let Fobj: any = {
+        mode: audioMode,
+        audioId: "3111002",//您的餐到了
+        url: currentcast ? currentcast.fileUrl : null,
+        volume: userstore.customSetting.sound.switchon ? userstore.customSetting.sound.voiceVolume : 0,
+        interval: currentcast ? currentcast.ruleInterval : -1,
+        duration: currentcast ? currentcast.ruleDuration : -1,
+    }
+    return Fobj
 }
 //开始引领
 const goTask = () => {
-    console.log(Guidelist, "引领列表")
+    let Guide_site = Guidelist.value
+    if (!Guide_site) {
+        toast.show('未选择站点')
+        return
+    }
+    let pts = [];
+    pts.push(
+        {
+            x: Guide_site.coordinate[0],
+            y: Guide_site.coordinate[1],
+            yaw: Guide_site.yaw,
+            ext: {
+                name: Guide_site.name,
+                id: Guide_site.id,
+                areaId:Guide_site.areaId
+            },
+            stepActs: [
+                {
+                    type: 5,//本地音频
+                    data: volumeculation(Guide_site.id)
+                },
+                //等待交互
+                {
+                    type: 40
+                }
+            ],
+        });
+
+    let standby = settingUtil.getStandbyStation()
+    let backPt = {
+        x: standby.coordinate[0],
+        y: standby.coordinate[1],
+        yaw: standby.yaw,
+        areaId:standby.areaId,
+        ext: {
+            name: "返航中",//standby.name,
+            id: standby.id,
+        },
+        stepActs: [
+        ],
+    }
+
+    let curPt = {
+        ext: {
+            name: "起点",//起点要做的事件
+        },
+        stepActs: [
+            {
+                type: 5,//本地音频
+                data: {
+                    mode: audioMode,
+                    audioId: "3111012",//"小舟要出发送餐了，请让一让"
+                    num: 1,
+                    volume: userstore.customSetting.sound.voiceVolume,
+                    interval: -1,
+                    duration: -1,
+                    channel: 1
+                },
+            },
+            {
+                type: 5,//背景音乐
+                data: {
+                    mode: audioMode,
+                    audioId: settingUtil.getbackgroundSong(),
+                    num: 999,
+                    volume: userstore.customSetting.sound.switchon ? userstore.customSetting.sound.voiceVolume : 0,
+                    interval: -1,
+                    duration: -1,
+                    channel: 2
+                },
+            },
+            {
+                type: 41,  //速度设置
+                data: {
+                    speed: userstore.customSetting.delivery.runSpeed / 100
+                }
+            },
+        ],
+    }
+
+    let task = {
+        name: "引领任务" + new Date().getTime(),
+        runNum: 1,
+        taskType: 2,
+        runType: 22,
+        curPt: curPt,
+        pts: pts,
+        backPt: backPt
+    };
+    robotUtil.startTask(task)
+
 }
+
+defineExpose({ Guidelist, userstore });
 </script>
     
 <template>
@@ -200,7 +339,10 @@ const goTask = () => {
             </div>
         </div>
         <div class="mu_sel_point">
-            <div class="guide_task font1" @click="goTask">立即出发</div>
+            <div class="guide_task font1" @click="goTask">
+                <span v-if="userstore.isModify">修改任务</span>
+                <span v-else>立即出发</span>
+            </div>
         </div>
 
     </div>

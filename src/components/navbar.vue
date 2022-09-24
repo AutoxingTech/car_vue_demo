@@ -7,10 +7,23 @@ const DataMessage: any = reactive({
   robotstate: useStore.robotstate,
   robotsce: '空闲'
 })
+const time = ref()
 onMounted(() => {
   let page = router.currentRoute.value.fullPath
   page && page.indexOf("task/task") >= 0 ? DataMessage.robotsce = '任务中' : DataMessage.robotsce = '空闲'
 })
+const timecomp = () => {
+  setInterval(() => {
+    let myDate = new Date();
+    let hours = myDate.getHours();
+    let minutes = myDate.getMinutes() + ""
+    if (minutes.length <= 1) {
+      minutes = "0" + minutes
+    }
+    time.value = hours + ":" + minutes
+  }, 1000)
+}
+timecomp()
 defineProps<{
   heights: string
 }>()
@@ -26,21 +39,16 @@ defineProps<{
       <div class="battercolor" :style="'width:'+(0.29*DataMessage.robotstate.battery)+'px'">
         <div class="batter100" v-if="DataMessage.robotstate.battery==100">Full</div>
       </div>
-
-
     </div>
     <img v-if="DataMessage.robotstate.isCharging" class="shandian" src="../assets/img/shandian.png" />
     <div class="wift_status" style="  font-weight: normal;color: #1FFF6D;margin-left: 5px;">
       {{DataMessage.robotstate.battery}}%
     </div>
-    <!-- <div class="wift_status" sytle="margin-left: 5px;">
-      4G
-    </div> -->
     <div class="volice_status">
       <img src="../assets/img/shengyin_shiti.png">
     </div>
     <div class="wift_status">
-      18.31
+      {{time}}
     </div>
   </div>
 </template>

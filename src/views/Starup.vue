@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import router from "../router";
-// import VueSlider from 'vue-slider-component'
-// import 'vue-slider-component/theme/antd.css'
 import {
     download,
     downloadStatus,
@@ -12,15 +10,13 @@ import {
     appVersion,
 } from "../js/android";
 import { ref, watch, defineComponent } from "@vue/runtime-core";
-import { AXRobot } from "@autoxing/robot-js-sdk/index.js";
 import { okRequest, setToken } from "../js/okRequest";
-import { initTable } from '../js/Datacollation'
-import { appId, appSecret, robotId, appMode } from "../js/globalConfig";
+import { initTable, setCurrentFloor } from '../js/Datacollation'
 import { globalData } from "../js/globalData";
-import { taskUtil } from "../js/taskUtil"
+import { robotUtil, MinLocQuality } from "../js/robotUtil"
+import { H5Version } from "../js/globalConfig";
 import store from "../store";
 import { onBeforeRouteLeave } from "vue-router";
-// import 'vue3-loading-overlay/dist/vue3-loading-overlay.css';
 let downWatch: Function, compressWatch: Function;
 const useStore = store()
 const CA = ref(1) //检查机器人状态 0无状态 1正在进行 2 完成
@@ -28,145 +24,136 @@ const CB = ref(0)  //检查软件资源
 const CC = ref(0)  //设置站点信息
 const CD = ref(0)  //检查定位系统图
 
-const CurrentappVersion = ref('1.0.1') // appVersion()   appversion
-const CurrentH5Version = ref(globalData.H5Version)  //H5version
+const CurrentappVersion = ref(appVersion())
+const CurrentH5Version = ref(H5Version)  //H5version
 const Abnormalcause = ref()  //错误弹框
 const downloading = ref(false) //正在下载
 const gosetting = ref(false) //是否跳转到设置页
 const setposeTip = ref(false)
 
 let timeoutgo: any = ''  //倒计时跳转
-let axRobot = new AXRobot(appId, appSecret, appMode);
 
-globalData.axRobot = axRobot
+function resetDate() {
+    CA.value = 1
+    CB.value = 0
+    CC.value = 0
+    CD.value = 0
+    Abnormalcause.value = ''
+    downloading.value = false
+    gosetting.value = false
+    setposeTip.value = false
+    timeoutgo = false
 
-
-//初始化
-axRobot.init().then((res: any) => {
-    console.log("axRobot.init()", res)
-    return axRobot.connectRobot({
-        robotId: robotId,
-    })
-}).then((res: any) => {
-    console.log(res)
-    globalData.sn = res.robotId;
-    taskUtil.init()
-    return axRobot.getToken();
-}).then((res: any) => {
-    setToken(res);
-    return okRequest.robotInfo();
-}).then((res: any) => {
-    CA.value = 2
-    CB.value = 1
-    useStore.$patch((state: any) => {
-        state.customSetting = res.settings
-    })
-    console.log(useStore.customSetting)
-    return CheackAppVersion()  //检查app版本
-}).then(() => {
-    return CheckH5Version()    //检查h5版本
-}).then(() => {
-    CB.value = 2
-    CC.value = 1
-    return new Promise((resolve, reject) => {
-        return initTable(axRobot, resolve, reject)  //设置站点
-    })
-}).then(() => {
-    CC.value = 2
-    CD.value = 1
-    return axRobot.getState()
-}).then((res: any) => {
-    return new Promise((resolve) => {  //检查定位信息
-        if (res.locQuality > 70) {
-            setTimeout(() => {
-                resolve(true)
-            }, 1000);
+}
+function initStart() {
+    //初始化
+    resetDate()
+    robotUtil.init().then((res: any) => {
+        return robotUtil.connectRobot()
+    }).then((res: any) => {
+        globalData.sn = res.robotId;
+        return robotUtil.getToken();
+    }).then((res: any) => {
+        setToken(res);
+        return okRequest.robotInfo();
+    }).then((res: any) => {
+        CA.value = 2
+        CB.value = 1
+        useStore.$patch((state: any) => {
+            state.customSetting = res.settings
+        })
+        return CheackAppVersion()  //检查app版本
+    }).then(() => {
+        return CheckH5Version()    //检查h5版本
+    }).then(() => {
+        CB.value = 2
+        CC.value = 1
+        return initTable()  //设置站点
+    }).then(() => {
+        CC.value = 2
+        CD.value = 1
+        return robotUtil.getState_P()
+    }).then((res: any) => {
+        CD.value = 2
+        console.log(res.areaId, "当前楼层的areaid")
+        setCurrentFloor(res.areaId)
+        if (res.locQuality > MinLocQuality) {
+            useStore.$patch((state: any) => {
+                state.nextpage = 1
+            })
+            if (!gosetting.value) {
+                timeoutgo = setTimeout(() => {
+                    redirectPage('/index')
+                }, 1500);
+            }
         } else {
-            setTimeout(() => {
-                resolve(false)
-            }, 1000);
+            setposeTip.value = true
+            useStore.$patch((state: any) => {
+                state.nextpage = 2
+            })
+            if (!gosetting.value) {
+                timeoutgo = setTimeout(() => {
+                    redirectPage('/setting')
+                }, 1500);
+            }
         }
+    }).catch((error: any) => {
+        Abnormalcause.value = error
     })
-}).then((res: boolean) => {
-    CD.value = 2
-    if (res) {
-        useStore.$patch((state: any) => {
-            state.nextpage = 1
-        })
-        if (!gosetting.value) {
-            timeoutgo = setTimeout(() => {
-                redirectPage('/index')
-            }, 1500);
-        }
-    } else {
-        setposeTip.value = true
-        useStore.$patch((state: any) => {
-            state.nextpage = 2
-        })
-        if (!gosetting.value) {
-            timeoutgo = setTimeout(() => {
-                redirectPage('/setting')
 
-            }, 1500);
-        }
-    }
-}).catch((error: any) => {
-    Abnormalcause.value = error
-})
+}
+initStart()
 //跳转
 function redirectPage(e: any) {
     router.replace({
         path: e
     })
 }
-//检查app版本  todo
+//检查app版本 
 function CheackAppVersion() {
-    return new Promise((resolve) => {
-        okRequest.upgrade_newest(1, 9).then((res: any) => {
-            if (res) {
-                if (CurrentappVersion.value != res.data.versionLabel) {
-                    //app有更新
-                    downloading.value = true
-                    upgradeApk(res.url)
-                } else {
-                    //app无更新 -->
-                    resolve(1)
-                }
+    return okRequest.upgrade_newest(1, 9).then((res: any) => {
+        if (res) {
+            if (CurrentappVersion.value.split(',')[1] != res.versionNumber) {
+                //app有更新
+                downloading.value = true
+                upgradeApk(res.url)
+                return new Promise(() => { })
             } else {
                 //app无更新 -->
-                resolve(1)
+                return Promise.resolve(1)
             }
-        })
-        //catch 全局异常弹框
+        } else {
+            //app无更新 -->
+            return Promise.resolve(1)
+        }
     })
+    //catch 全局异常弹框
 }
 //检查H5
 function CheckH5Version() {
-    return new Promise((resolve) => {
-        okRequest.upgrade_newest(3, 1).then((res: any) => {
-            if (res) {
-                if (CurrentH5Version.value != res.versionLabel) {
-                    //h5有更新
-                    downloading.value = true
-                    upgradeH5(res.url)
-                } else {
-                    //h5无更新  -->
-                    resolve(1)
-                }
+    return okRequest.upgrade_newest(3, 1).then((res: any) => {
+        if (res) {
+            if (CurrentH5Version.value != res.versionNumber) {
+                //h5有更新
+                downloading.value = true
+                upgradeH5(res.url)
+                return new Promise(() => { })
             } else {
-                resolve(1)
+                //h5无更新  -->
+                return Promise.resolve(1)
             }
-        })
-        //catch 全局异常弹框
+        } else {
+            return Promise.resolve(1)
+        }
     })
 }
 //重试刷新
 function TryRefresh() {
-    webRefresh("");
+    initStart()
 }
 //下载
-function upgrade(url: String, name: String) {
-    const path = "/storage/emulated/0/Android/data/com.autoxing.delivery/files";
+function upgrade(url: String, path: String, name: String) {
+
     let pathName = path + "/" + name;
 
     download(url, path, name);
@@ -185,6 +172,7 @@ function upgrade(url: String, name: String) {
                 }
             } else if (newvalue == -1) {
                 //下载失败
+                Abnormalcause.value = '文件下载失败'
             }
         }
     );
@@ -199,6 +187,7 @@ function upgrade(url: String, name: String) {
                 //解压成功
             } else if (newvalue == -1) {
                 //解压失败
+                Abnormalcause.value = '文件解压失败'
             }
         }
     );
@@ -206,14 +195,16 @@ function upgrade(url: String, name: String) {
 //下载h5路径
 function upgradeH5(e: any) {
     const url = e
+    const path = "/storage/emulated/0/Android/data/com.autoxing.delivery/files";
     const name = "dist.zip"; //carPad.apk
-    upgrade(url, name);
+    upgrade(url, path, name);
 }
 // 下载apk路径
 function upgradeApk(e: any) {
     const url = e
-    const name = "carPad.apk"; //carPad.apk dist.zip
-    upgrade(url, name);
+    const path = "/storage/emulated/0/Download";
+    const name = "carPad.apk";
+    upgrade(url, path, name);
 }
 //顶部设置按钮点击
 function navsetting() {
@@ -253,13 +244,20 @@ export default defineComponent({
                 }
             });
         } else {
-            next()
+            next((vm) => {
+                const instance: any = vm;
+                if (instance.useStore.reFresh) {
+                    instance.useStore.$patch((state: any) => {
+                        state.reFresh = false
+                        location.reload()
+                    })
+                }
+            })
         }
     },
 });
 </script>
 <template>
-    <div></div>
     <div class="top_header ocenter">
         <img src="../assets/img/logo.png" />
     </div>
@@ -324,9 +322,6 @@ export default defineComponent({
         <img src="../assets/img/set.png" />
         <div>系统设置</div>
     </div>
-    <!-- <div class="font1" style="margin-top: -100px" @click="goindex">模拟启动</div>
-        <div class="font1" @click="upgradeH5">升级H5</div>
-        <div class="font1" @click="upgradeApk">升级APK车机测试</div> -->
 
     <!-- 流程弹框 -->
     <div class="ocenter startank" v-if="Abnormalcause">

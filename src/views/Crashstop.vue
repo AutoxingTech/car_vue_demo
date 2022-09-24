@@ -1,117 +1,45 @@
 <script lang='ts'>
 import { defineComponent, reactive } from 'vue'
-import { taskUtil } from '../js/taskUtil';
+import { CrashStatus } from '../js/globalData';
+import { robotUtil } from '../js/robotUtil';
 import settingUtil from '../js/settingUtil';
 import router from '../router';
 export default defineComponent({
-
     setup() {
-
         let obj = reactive({
             frompath: '',
         })
 
         function goon() {
             console.log("goon")
-            taskUtil.cancelEmergencyStop().then((res: any) => {
+            CrashStatus.value = 1
+            robotUtil.cancelEmergencyStop().then(() => {
 
-            }).catch((e: any) => {
-                console.log(e)
             })
         }
 
         function gostay() {
             console.log("gostay")
-            taskUtil.cancelEmergencyStop().then((res: any) => {
+            CrashStatus.value = 2
+            robotUtil.cancelEmergencyStop().then((res: any) => {
                 if (obj.frompath == '/task') {
-                    taskUtil.cancelTask()
-                } else {
-                    router.go(-1)
+                    robotUtil.cancelTask()
                 }
-            }).catch((e: any) => {
-                console.log(e)
+                router.back()
             })
         }
 
         function gochar() {
-            taskUtil.cancelEmergencyStop().then((res: any) => {
-                let sta = settingUtil.getChargeStation()
-                if (sta) {
-                    let task = {
-                        name: "充电任务" + new Date().getTime(),
-                        taskType: 2,
-                        runType: 25,
-                        runNum: 1,
-                        pts: [{
-                            x: sta.coordinate[0],
-                            y: sta.coordinate[1],
-                            yaw: sta.yaw,
-                            ext: {
-                                name: sta.name,
-                                id: sta.id
-                            },
-                            stepActs: [
-                                // {
-                                //     type: ActionType.PlayAudio,
-                                //     interval: 10,
-                                //     url:
-                                //         "https://autoxingtest1.oss-cn-beijing.aliyuncs.com/mp3/autoxing/yijia_task_running.mp3",
-                                // },
-                            ],
-                        }],
-                    };
-                    console.log("发送任务", task);
-                    taskUtil.startTask(task).then((res: any) => {
-                        console.log(res);
-                    }).catch((e: any) => {
-                        console.log(e);
-                    })
-                } else {
-                    console.log("未设置充电桩")
-                }
-            }).catch((e: any) => {
-                console.log(e)
+            CrashStatus.value = 3
+            robotUtil.cancelEmergencyStop().then((res: any) => {
+                settingUtil.goCharpile(settingUtil.getChargeStation())
             })
         }
 
         function goit() {
-            taskUtil.cancelEmergencyStop().then((res: any) => {
-                let sta = settingUtil.getStandbyStation()
-                if (sta) {
-                    let task = {
-                        name: "返航任务" + new Date().getTime(),
-                        taskType: 2,
-                        runType: 24,
-                        runNum: 1,
-                        pts: [{
-                            x: sta.coordinate[0],
-                            y: sta.coordinate[1],
-                            yaw: sta.yaw,
-                            ext: {
-                                name: sta.name,
-                                id: sta.id
-                            },
-                            stepActs: [
-                                // {
-                                //     type: ActionType.PlayAudio,
-                                //     interval: 10,
-                                //     url:
-                                //         "https://autoxingtest1.oss-cn-beijing.aliyuncs.com/mp3/autoxing/yijia_task_running.mp3",
-                                // },
-                            ],
-                        }],
-                    };
-                    console.log("发送任务", task);
-                    taskUtil.startTask(task).then((res: any) => {
-                        console.log(res);
-                    }).catch((e: any) => {
-                        console.log(e);
-                    })
-                } else {
-                    console.log("未设置待命点")
-                }
-            }).catch((e: any) => {
-                console.log(e)
+            CrashStatus.value = 4
+            robotUtil.cancelEmergencyStop().then((res: any) => {
+                settingUtil.goStandby(settingUtil.getStandbyStation())
             })
         }
 
@@ -120,11 +48,12 @@ export default defineComponent({
     beforeRouteEnter(to, from, next) {
         next((e: any) => {
             e.obj.frompath = from.fullPath
+            CrashStatus.value = 0
         })
     },
 })
 </script>
-
+    
 <template>
     <div class="float1"></div>
     <div class="float2"></div>
@@ -144,7 +73,7 @@ export default defineComponent({
         <div class="crash_choice" @click="goon" style="box-shadow: 0 0px 40px 0px #83A9FF;">
             <div class="li1">继续任务</div>
             <div class="taskonimg">
-                <img src="../assets/img/crashico1.png" style="width:100%;height: 100%;">
+                <img src="../assets/img/crashstopic1.png" style="width:100%;height: 100%;">
             </div>
         </div>
         <div class="crash_choice" @click="gochar">
@@ -167,7 +96,7 @@ export default defineComponent({
         </div>
     </div>
 </template>
-
+    
 <style scoped>
 .tip {
     height: 100px;
@@ -259,7 +188,7 @@ export default defineComponent({
     margin-top: 34px;
     font-size: 34px;
     font-weight: bold;
-    color: #000000;
+    color: white;
 }
 
 .li2 {
@@ -330,3 +259,4 @@ export default defineComponent({
     border-radius: 50%;
 }
 </style>
+    

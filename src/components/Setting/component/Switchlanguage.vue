@@ -53,8 +53,11 @@ const Enerchange = () => {
                         <div>{{item.desc}}</div>
                     </div>
                     <div class="rght1">
-                        <img
-                            :src="currentLanguage==item.char?'/src/assets/img/language1.png':'/src/assets/img/selout.png'">
+                        <!-- <img
+                            :src="currentLanguage==item.char?'/src/assets/img/language1.png':'/src/assets/img/selout.png'"> -->
+
+                        <img v-if="currentLanguage==item.char" src="../../../assets/img/language1.png" />
+                        <img v-else src="../../../assets/img/selout.png" />
                     </div>
                 </div>
 

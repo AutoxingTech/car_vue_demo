@@ -4,9 +4,29 @@ import VueSlider from 'vue-slider-component'
 import 'vue-slider-component/theme/default.css'
 import store from '../../store';
 import my_switch from "./component/Soundswitch.vue";
+import SongSelectVue from './component/SongSelect.vue';
+import { songlist } from '../../js/Datacollation'
 const useStore: any = store()
 console.log(useStore.customSetting)
+const Defaultsong: any = ref()
+const showSongsel = ref(false)
+const defaultsongname = ref()
 
+if (!useStore.customSetting.sound.musicFile) {
+    Defaultsong.value = songlist[0].id
+    useStore.$patch((state: any) => {
+        state.customSetting.sound.musicFile = songlist[0].id
+    })
+} else {
+    Defaultsong.value = useStore.customSetting.sound.musicFile
+}
+
+for (let i in songlist) {
+    if (songlist[i].id == useStore.customSetting.sound.musicFile) {
+        defaultsongname.value = songlist[i].name
+        break
+    }
+}
 //声音开启
 const switchon = ref(useStore.customSetting.sound.switchon)
 const Changeswitch = (e: boolean) => {
@@ -49,10 +69,30 @@ const Sound3change = (e: any) => {
         state.customSetting.sound.avoidVolume = e
     })
 }
+const TankControl = () => {
+    showSongsel.value = !showSongsel.value
+}
+const changesong = (e: any) => {
+    const type: number = e
+    useStore.$patch((state: any) => {
+        state.customSetting.sound.musicFile = type
+        Defaultsong.value = type
+        for (let i in songlist) {
+            if (songlist[i].id == state.customSetting.sound.musicFile) {
+                defaultsongname.value = songlist[i].name
+                break
+            }
+        }
+    })
+    showSongsel.value = false
+}
 
 </script>
 <template>
     <div>
+        <div v-if="showSongsel">
+            <SongSelectVue :songlist="songlist" @TankControl="TankControl" @change-stand="changesong" />
+        </div>
         <div class="volive_control">
             <div class="volice1">
                 <div class="font4">声音控制</div>
@@ -101,10 +141,10 @@ const Sound3change = (e: any) => {
             </div>
         </div>
 
-        <div class="vone_setbox">
+        <div class="vone_setbox" @click="TankControl">
             <div class="vsetname font4">背景音乐选择</div>
             <div class="vbox_rightset">
-                <div class="font5" style="margin-right:20px">默认背景音乐</div>
+                <div class="font5" style="margin-right:20px">{{defaultsongname}}</div>
                 <img src="../../assets/img/setting_arrow_down.png" style="width: 16px;height: 9px;">
             </div>
         </div>

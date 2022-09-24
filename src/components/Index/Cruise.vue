@@ -1,71 +1,25 @@
 <script lang="ts" setup>
 import { ref, reactive } from 'vue';
+import { CuriseLists, poiMap } from '../../js/Datacollation';
+import { okRequest } from '../../js/okRequest';
+import { audioMode } from "../../js/globalConfig"
+import settingUtil from "../../js/settingUtil"
+import store from '../../store';
+import { robotUtil } from '../../js/robotUtil';
+import { toast } from '../Toast/Toast';
+import { stat } from 'fs';
+const userstore: any = store()
 const showChoicemaptank = ref(false) //选择巡游地图的弹框
 const showChoicenumtank = ref(false)
 const currentmapId: any = ref(0) //巡游地图id
-const ficcuriseType: any = ref(0) //循环类型（虚拟判断ui）
+const ficcuriseType: any = ref(0) //循环类型（虚拟判断ui） 0是无限巡游  1是按次巡游
 const curiseType: any = ref(0) //循环类型
-const curiseNum: any = ref(0) //循环次数
-const curiseMaps: any = reactive([
-    {
-        name: '巡游1',
-        sel: true,
-        sites: [
-            {
-                'poiName': '大门口'
-            },
-            {
-                'poiName': '1层货柜'
-            },
-            {
-                'poiName': '2层货柜'
-            },
-            {
-                'poiName': '保安室'
-            },
-            {
-                'poiName': '3号实验室'
-            },
-            {
-                'poiName': '2号实验室'
-            },
-            {
-                'poiName': '1层食堂'
-            },
-            {
-                'poiName': '接待室'
-            },
-            {
-                'poiName': '接待室'
-            }
-        ]
-    },
-    {
-        name: '巡游2',
-        sel: false,
-
-    },
-    {
-        name: '巡游3',
-        sel: false
-    },
-    {
-        name: '巡游4',
-        sel: false
-    },
-    {
-        name: '巡游5',
-        sel: false
-    }
-])
-
-const circulatequene: any = reactive([])
+const FicrunNum = ref(1) //循环次数
+const circulatequene: any = reactive([]) //地图循环显示的数据
+const curiseMaps: any = reactive({  //地图列表数据
+    curiseList: CuriseLists
+})
 for (let i = 1; i <= 12; i++) { //初始化巡游站点位置
-    // console.log("-------", i, j)
-    // let j = 12.0 / i
-    // for (let k = 0; k < i; k++) {
-    // console.log((k * j + 1).toFixed(0))
-    // }
     let left, tag, top
     if (i <= 4) {
         if (i == 1) {
@@ -103,12 +57,12 @@ for (let i = 1; i <= 12; i++) { //初始化巡游站点位置
         top: top
     })
 }
-
+//设置站点位置
 function curMmap() {
-    if (currentmapId.value >= curiseMaps.length) {
+    if (currentmapId.value >= curiseMaps.curiseList.length) {
         currentmapId.value = 0
     }
-    let sites = curiseMaps[currentmapId.value].sites
+    let sites = curiseMaps.curiseList[currentmapId.value].sites
 
     let i = sites.length
     let j = 12.0 / i
@@ -120,33 +74,44 @@ function curMmap() {
         let pos = (k * j).toFixed(0)
         circulatequene[pos].table = sites[k]
     }
-    console.log(circulatequene, "列表")
 }
-curMmap()
-
-
+//更新巡游列表的数据
+function getCruisList() {
+    okRequest.CuriseList().then((res: any) => {
+        curiseMaps.curiseList = res
+        for (let i in curiseMaps.curiseList) {
+            curiseMaps.curiseList[i].sel = false
+            if (i == currentmapId.value) {
+                curiseMaps.curiseList[i].sel = true
+            }
+        }
+        curMmap()
+    })
+}
+getCruisList()  //进入开始初始化巡游站点
 //点击当前地图
 function choice_map(index: any) {
-    for (let i of curiseMaps) {
+    for (let i of curiseMaps.curiseList) {
         i.sel = false
     }
-    curiseMaps[index].sel = true
+    curiseMaps.curiseList[index].sel = true
 }
 //确认选择本张地图
 function sel_map() {
-    for (let i in curiseMaps) {
-        if (curiseMaps[i].sel) {
+    for (let i in curiseMaps.curiseList) {
+        if (curiseMaps.curiseList[i].sel) {
             currentmapId.value = i
+            curMmap()
         }
     }
     tank_control()
 }
 //取消切换巡游地图
 function tank_control() {
-    for (let i of curiseMaps) {
+    for (let i of curiseMaps.curiseList) {
         i.sel = false
     }
-    curiseMaps[currentmapId.value].sel = true
+    curiseMaps.curiseList[currentmapId.value].sel = true
     showChoicemaptank.value = !showChoicemaptank.value
 }
 //选择巡游类型
@@ -156,21 +121,204 @@ function tank_control2() {
 }
 //去定选择巡游类型
 function sel_num() {
+    //如果填入的值为空或者为0 默认设置为1
+    if (!FicrunNum.value || FicrunNum.value == 0) {
+        FicrunNum.value = 1
+    }
+    //
     curiseType.value = ficcuriseType.value
     showChoicenumtank.value = !showChoicenumtank.value
 }
 
-
-
 //数量减
 function numDown() {
-    if (curiseNum.value != 0) {
-        curiseNum.value -= 1
+    if (FicrunNum.value != 0) {
+        FicrunNum.value -= 1
     }
 }
 //数量加
 function numUp() {
-    curiseNum.value += 1
+    FicrunNum.value += 1
+}
+//输入
+function setinput(e: any) {
+    if (FicrunNum.value < 0) {
+        FicrunNum.value = 1
+    }
+}
+
+//站点语音
+function volumeculation(e: any) {
+    let currentcast = null
+    let broadcasts = poiMap[1 + ""]  //3==巡游
+    if (broadcasts[e + ""] != undefined) {
+        currentcast = broadcasts[e + ""]
+    }
+    let Fobj: any = {
+        mode: audioMode,
+        audioId: "3111002",//您的餐到了
+        url: currentcast ? currentcast.fileUrl : '',
+        volume: userstore.customSetting.sound.switchon ? userstore.customSetting.sound.voiceVolume : 0,
+        interval: currentcast ? currentcast.ruleInterval : -1,
+        duration: currentcast ? currentcast.ruleDuration : -1,
+    }
+    if (currentcast) {
+        return Fobj
+    } else {
+        return {}
+    }
+}
+
+//开始巡游
+function goTask() {
+    let runNum = 0
+    if (ficcuriseType.value == 0) {
+        runNum = 99999
+    } else if (ficcuriseType.value == 1) {
+        runNum = FicrunNum.value
+    }
+    //如果默认为空
+    if (!userstore.customSetting.cruise) {
+        userstore.$patch((state: any) => {
+            state.customSetting.cruise = {}
+            state.customSetting.cruise.standbyTime = 30
+            state.customSetting.cruise.speed = 30
+        })
+    }
+    let list: any = []
+    let stations = curiseMaps.curiseList[currentmapId.value].sites
+    new Promise((resolve) => {
+        if (stations[0].areaId) {
+            resolve(stations)
+        } else {
+            let j = 0
+            let arr: any = []
+            let done = () => {
+                j++
+                if (j == stations.length) {
+                    for (let i = 0; i < stations.length; i++) {
+                        if (stations[i]) {
+                            arr.push(stations[i])
+                        }
+                    }
+                    if (arr.length > 0) {
+                        resolve(arr)
+                    } else {
+                        toast.show("站点已失效")
+                    }
+
+                }
+            }
+            for (let i = 0; i < stations.length; i++) {
+                robotUtil.getPoiById(stations[i].poiId).then((res: any) => {
+                    stations[i] = res
+                    done()
+                }).catch((err: any) => {
+                    done()
+                })
+            }
+        }
+    }).then((Sortlist: any) => {
+        let pts = [];
+        for (let i = 0; i < Sortlist.length; i++) {
+            let poi = Sortlist[i]
+            pts.push(
+                {
+                    x: poi.coordinate[0],
+                    y: poi.coordinate[1],
+                    yaw: poi.yaw,
+                    //托盘
+                    ext: {
+                        name: poi.name,
+                        id: poi.id,
+                        areaId: poi.areaId
+                    },
+                    stepActs: [
+
+                        {
+                            type: 5,//本地音频
+                            data: volumeculation(poi.id)
+                        },
+                        {
+                            type: 18,   //到达停留时间
+                            data: {
+                                pauseTime: userstore.customSetting.cruise.standbyTime
+                            }
+                        }
+                    ],
+                });
+        }
+
+        if (pts.length > 0) {
+            let standby = settingUtil.getStandbyStation()
+            let backPt = {
+                x: standby.coordinate[0],
+                y: standby.coordinate[1],
+                yaw: standby.yaw,
+                ext: {
+                    name: "返航中",//standby.name,
+                    id: standby.id,
+                    areaId: standby.areaId
+                },
+                stepActs: [
+                ],
+            }
+
+            let curPt = {
+                ext: {
+                    name: "起点",//起点要做的事件
+                },
+                stepActs: [
+                    {
+                        type: 5,//本地音频
+                        data: {
+                            mode: audioMode,
+                            audioId: "3111012",
+                            num: 1,
+                            volume: userstore.customSetting.sound.switchon ? userstore.customSetting.sound.voiceVolume : 0,
+                            interval: -1,
+                            duration: -1,
+                            channel: 1
+                        },
+                    },
+                    {
+                        type: 5,//背景音乐
+                        data: {
+                            mode: audioMode,
+                            audioId: settingUtil.getbackgroundSong(),
+                            num: 999,
+                            volume: userstore.customSetting.sound.switchon ? userstore.customSetting.sound.voiceVolume : 0,
+                            interval: -1,
+                            duration: -1,
+                            channel: 2
+                        },
+                    },
+                    {
+                        type: 41,  //速度设置
+                        data: {
+                            speed: userstore.customSetting.cruise.speed / 100
+                        }
+                    },
+                ],
+            }
+
+            let task = {
+                name: "巡游任务" + new Date().getTime(),
+                runNum: runNum,
+                taskType: 2,
+                runType: 23,  //23巡游
+                curPt: curPt,
+                pts: pts,
+                backPt: backPt
+            };
+            robotUtil.startTask(task)
+        } else {
+            toast.show("无站点数据")
+        }
+
+    })
+
+
 }
 </script>
 
@@ -182,7 +330,7 @@ function numUp() {
                 <div class="emptyline"></div>
             </div>
             <div class="curise_maplist" @click="tank_control">
-                <div>{{curiseMaps[currentmapId].name}}</div>
+                <div v-if="curiseMaps.curiseList.length>0">{{curiseMaps.curiseList[currentmapId].name}}</div>
                 <div>切换</div>
             </div>
         </div>
@@ -244,15 +392,15 @@ function numUp() {
                 </div>
                 <img src="../../assets/img/curisedown.png">
             </div>
-            <div class="curise_enter2 font1">立即出发</div>
+            <div class="curise_enter2 font1" @click="goTask">立即出发</div>
         </div>
 
         <!-- //选择巡游图 -->
         <div class="cruise_tank" v-if="showChoicemaptank">
             <div class="curise_mapchoice">
                 <div class="mapchoice_top font6">巡游路线选择</div>
-                <div :class="curiseMaps.length>4?'mp_content2':'mp_content'">
-                    <div v-for="(item,index) in curiseMaps" :key="index" @click="choice_map(index)">
+                <div :class="curiseMaps.curiseList.length>4?'mp_content2':'mp_content'">
+                    <div v-for="(item,index) in curiseMaps.curiseList" :key="index" @click="choice_map(index)">
                         <div class="font6">{{item.name}}</div>
                         <div class="curimg">
                             <img v-if="item.sel" src="../../assets/img/language1.png" alt="">
@@ -294,7 +442,7 @@ function numUp() {
                         <div>
                             <div class="jian" @click="numDown">-</div>
                             <div class="putnum">
-                                <input type="number" v-model="curiseNum">
+                                <input type="number" v-model="FicrunNum" @input="setinput">
                             </div>
                             <div class="jia" @click="numUp">+</div>
                         </div>
