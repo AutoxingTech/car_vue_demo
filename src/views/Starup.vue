@@ -62,9 +62,9 @@ function initStart() {
         useStore.$patch((state: any) => {
             state.customSetting = res.settings
         })
-        return CheackAppVersion()  //检查app版本
+        // return CheackAppVersion()  //检查app版本
     }).then(() => {
-        return CheckH5Version()    //检查h5版本
+        // return CheckH5Version()    //检查h5版本
     }).then(() => {
         CB.value = 2
         CC.value = 1

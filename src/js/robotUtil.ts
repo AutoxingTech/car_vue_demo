@@ -219,7 +219,9 @@ const onStateChanged = (data: any) => {
             for (let i in robotstatus) {
                 state.robotstate[i] = robotstatus[i];
             }
-            state.vers = data.vers.hwVer + ' ' + data.vers.softVer
+            if(data.vers){
+                state.vers = data.vers.hwVer + ' ' + data.vers.softVer
+            }
         })
         state = data
         if (isEmergencyStop != data.isEmergencyStop) {
