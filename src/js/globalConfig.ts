@@ -15,9 +15,9 @@ let disurl =  "https://api.autoxing.com/mobileapp/v1.1"
 export const H5Version = '100'
 
 export const baseUrl: any = disurl
-export const appId = "ax1498b3afe2fd419f" 
-export const appSecret = "6ff7a110628f4d20822195221eecf60c"
-export const robotId = "239220770025345"  //机器人sn
+export const appId = "ax1498b3afe2f----" 
+export const appSecret = "6ff7a110628f4d20822195221e----"
+export const robotId = "23922077002-----"  //机器人sn
 export const appMode = AppMode.WAN_APP
 export const audioMode = 1 //1车机2底盘
 
