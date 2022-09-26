@@ -115,10 +115,10 @@ export default {
                 x: standby.coordinate[0],
                 y: standby.coordinate[1],
                 yaw: standby.yaw,
+                areaId: standby.areaId,
                 ext: {
                     name: standby.name,
-                    id: standby.id,
-                    areaId: standby.areaId
+                    id: standby.id
                 },
                 stepActs: [
 
@@ -154,10 +154,10 @@ export default {
                 x: standby.coordinate[0],
                 y: standby.coordinate[1],
                 yaw: standby.yaw,
+                areaId: standby.areaId,
                 ext: {
                     name: "返航中",
-                    id: standby.id,
-                    areaId: standby.areaId
+                    id: standby.id
                 },
                 stepActs: [
                 ],

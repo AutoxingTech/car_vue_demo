@@ -290,10 +290,10 @@ function goTask() {
                 x: poi.coordinate[0],
                 y: poi.coordinate[1],
                 yaw: poi.yaw,
+                areaId: poi.areaId,
                 ext: {
                     name: poi.name,
                     id: poi.id,
-                    areaId: poi.areaId,
                     idx: palletmap[poi.id + ""],
                     len: pallet.length
                 },
@@ -332,10 +332,10 @@ function goTask() {
             x: standby.coordinate[0],
             y: standby.coordinate[1],
             yaw: standby.yaw,
+            areaId: standby.areaId,
             ext: {
                 name: "返航中",//standby.name,
-                id: standby.id,
-                areaId: standby.areaId
+                id: standby.id
             },
             stepActs: [],
         }

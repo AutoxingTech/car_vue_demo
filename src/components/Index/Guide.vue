@@ -153,10 +153,10 @@ const goTask = () => {
             x: Guide_site.coordinate[0],
             y: Guide_site.coordinate[1],
             yaw: Guide_site.yaw,
+            areaId: Guide_site.areaId,
             ext: {
                 name: Guide_site.name,
-                id: Guide_site.id,
-                areaId:Guide_site.areaId
+                id: Guide_site.id
             },
             stepActs: [
                 {
@@ -175,7 +175,7 @@ const goTask = () => {
         x: standby.coordinate[0],
         y: standby.coordinate[1],
         yaw: standby.yaw,
-        areaId:standby.areaId,
+        areaId: standby.areaId,
         ext: {
             name: "返航中",//standby.name,
             id: standby.id,
