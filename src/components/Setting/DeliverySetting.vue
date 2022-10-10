@@ -67,26 +67,26 @@ const setlastPallent = (e: any) => {
         <div class="delive_setting">
             <div>
                 <div>
-                    <span class="delive_span1 font4">托盘设置</span>
-                    <span class="delive_span2">设置托盘的层数和高度</span>
+                    <span class="delive_span1 font4">{{$t('setting.tpsz')}}</span>
+                    <span class="delive_span2">{{$t('setting.sztpcs')}}</span>
                 </div>
-                <div @click="Pallentset()">设置托盘</div>
+                <div @click="Pallentset()">{{$t('setting.sztp')}}</div>
             </div>
         </div>
 
         <div class="delive_setting2">
             <div>
                 <div class="delive_top">
-                    <span class="delive_span1 font4">配送停留时间</span>
-                    <span class="delive_span2">到达取物点等待时长</span>
+                    <span class="delive_span1 font4">{{$t('setting.pstlsj')}}</span>
+                    <span class="delive_span2">{{$t('setting.ddqwdddsc')}}</span>
                 </div>
                 <div class="delive_bottom">
-                    <div>10秒</div>
+                    <div>10s</div>
                     <div class="delive_bottom_center">
                         <VueSlider style="width: 100%;" v-bind="options1" v-model="time1" @change="Time1change"
                             :tooltip-formatter="`${time1}s`" />
                     </div>
-                    <div>300秒</div>
+                    <div>300s</div>
                 </div>
             </div>
 
@@ -94,8 +94,8 @@ const setlastPallent = (e: any) => {
 
             <div>
                 <div class="delive_top">
-                    <span class="delive_span1 font4">配送暂停时长</span>
-                    <span class="delive_span2">暂停后倒计时时长</span>
+                    <span class="delive_span1 font4">{{$t('setting.psztsc')}}</span>
+                    <span class="delive_span2">{{$t('setting.zthdjssc')}}</span>
                 </div>
                 <div class="delive_bottom">
                     <div>10s</div>
@@ -109,8 +109,8 @@ const setlastPallent = (e: any) => {
 
             <div>
                 <div class="delive_top">
-                    <span class="delive_span1 font4">行走速度</span>
-                    <span class="delive_span2">设置机器人送物时行驶速度</span>
+                    <span class="delive_span1 font4">{{$t('setting.xzsd')}}</span>
+                    <span class="delive_span2">{{$t('setting.szjqrswxssd')}}</span>
                 </div>
                 <div class="delive_bottom">
                     <div>10cm/s</div>

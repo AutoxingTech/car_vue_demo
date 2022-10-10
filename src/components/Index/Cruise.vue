@@ -2,19 +2,20 @@
 import { ref, reactive } from 'vue';
 import { CuriseLists, poiMap } from '../../js/Datacollation';
 import { okRequest } from '../../js/okRequest';
-import { audioMode } from "../../js/globalConfig"
+import { audioMode, ActionType } from "../../js/globalConfig"
 import settingUtil from "../../js/settingUtil"
 import store from '../../store';
 import { robotUtil } from '../../js/robotUtil';
 import { toast } from '../Toast/Toast';
-import { stat } from 'fs';
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 const userstore: any = store()
 const showChoicemaptank = ref(false) //选择巡游地图的弹框
 const showChoicenumtank = ref(false)
 const currentmapId: any = ref(0) //巡游地图id
 const ficcuriseType: any = ref(0) //循环类型（虚拟判断ui） 0是无限巡游  1是按次巡游
 const curiseType: any = ref(0) //循环类型
-const FicrunNum = ref(1) //循环次数
+const FicrunNum = ref(2) //循环次数
 const circulatequene: any = reactive([]) //地图循环显示的数据
 const curiseMaps: any = reactive({  //地图列表数据
     curiseList: CuriseLists
@@ -59,6 +60,9 @@ for (let i = 1; i <= 12; i++) { //初始化巡游站点位置
 }
 //设置站点位置
 function curMmap() {
+    if (!curiseMaps.curiseList || curiseMaps.curiseList.length == 0) {
+        return
+    }
     if (currentmapId.value >= curiseMaps.curiseList.length) {
         currentmapId.value = 0
     }
@@ -108,6 +112,9 @@ function sel_map() {
 }
 //取消切换巡游地图
 function tank_control() {
+    if (!curiseMaps.curiseList || curiseMaps.curiseList.length == 0) {
+        return
+    }
     for (let i of curiseMaps.curiseList) {
         i.sel = false
     }
@@ -138,6 +145,9 @@ function numDown() {
 }
 //数量加
 function numUp() {
+    if (!ficcuriseType.value) {
+        FicrunNum.value = 0
+    }
     FicrunNum.value += 1
 }
 //输入
@@ -150,19 +160,25 @@ function setinput(e: any) {
 //站点语音
 function volumeculation(e: any) {
     let currentcast = null
-    let broadcasts = poiMap[1 + ""]  //3==巡游
+    let broadcasts = poiMap[1 + ""]  //1==巡游
     if (broadcasts[e + ""] != undefined) {
         currentcast = broadcasts[e + ""]
     }
-    let Fobj: any = {
-        mode: audioMode,
-        audioId: "3111002",//您的餐到了
-        url: currentcast ? currentcast.fileUrl : '',
-        volume: userstore.customSetting.sound.switchon ? userstore.customSetting.sound.voiceVolume : 0,
-        interval: currentcast ? currentcast.ruleInterval : -1,
-        duration: currentcast ? currentcast.ruleDuration : -1,
-    }
+
     if (currentcast) {
+        let Fobj: any = {
+            mode: audioMode,
+            url: currentcast.fileUrl,
+            volume: userstore.customSetting.sound.switchon ? userstore.customSetting.sound.voiceVolume : 0,
+            interval: currentcast.ruleInterval,
+            duration: -1,
+        }
+        // 1 按播报次数  2按照播报时间
+        if (currentcast.ruleType == 1) {
+            Fobj.num = currentcast.ruleCount
+        } else if (currentcast.runType == 2) {
+            Fobj.duration = currentcast.ruleDuration
+        }
         return Fobj
     } else {
         return {}
@@ -186,6 +202,10 @@ function goTask() {
         })
     }
     let list: any = []
+    if (!curiseMaps.curiseList || curiseMaps.curiseList.length == 0) {
+        toast.show(t('index.wzdsj'))
+        return
+    }
     let stations = curiseMaps.curiseList[currentmapId.value].sites
     new Promise((resolve) => {
         if (stations[0].areaId) {
@@ -204,9 +224,8 @@ function goTask() {
                     if (arr.length > 0) {
                         resolve(arr)
                     } else {
-                        toast.show("站点已失效")
+                        toast.show(t('index.zdysx'))
                     }
-
                 }
             }
             for (let i = 0; i < stations.length; i++) {
@@ -227,20 +246,20 @@ function goTask() {
                     x: poi.coordinate[0],
                     y: poi.coordinate[1],
                     yaw: poi.yaw,
+                    areaId: poi.areaId,
                     //托盘
                     ext: {
                         name: poi.name,
-                        id: poi.id,
-                        areaId: poi.areaId
+                        id: poi.id
                     },
                     stepActs: [
 
                         {
-                            type: 5,//本地音频
+                            type: ActionType.PlayAudio,//本地音频
                             data: volumeculation(poi.id)
                         },
                         {
-                            type: 18,   //到达停留时间
+                            type: ActionType.Pause,   //到达停留时间
                             data: {
                                 pauseTime: userstore.customSetting.cruise.standbyTime
                             }
@@ -252,13 +271,14 @@ function goTask() {
         if (pts.length > 0) {
             let standby = settingUtil.getStandbyStation()
             let backPt = {
+                type: standby.type,
                 x: standby.coordinate[0],
                 y: standby.coordinate[1],
                 yaw: standby.yaw,
+                areaId: standby.areaId,
                 ext: {
                     name: "返航中",//standby.name,
-                    id: standby.id,
-                    areaId: standby.areaId
+                    id: standby.id
                 },
                 stepActs: [
                 ],
@@ -270,19 +290,7 @@ function goTask() {
                 },
                 stepActs: [
                     {
-                        type: 5,//本地音频
-                        data: {
-                            mode: audioMode,
-                            audioId: "3111012",
-                            num: 1,
-                            volume: userstore.customSetting.sound.switchon ? userstore.customSetting.sound.voiceVolume : 0,
-                            interval: -1,
-                            duration: -1,
-                            channel: 1
-                        },
-                    },
-                    {
-                        type: 5,//背景音乐
+                        type: ActionType.PlayAudio,//背景音乐
                         data: {
                             mode: audioMode,
                             audioId: settingUtil.getbackgroundSong(),
@@ -294,7 +302,7 @@ function goTask() {
                         },
                     },
                     {
-                        type: 41,  //速度设置
+                        type: ActionType.SetSpeed,  //速度设置
                         data: {
                             speed: userstore.customSetting.cruise.speed / 100
                         }
@@ -313,7 +321,7 @@ function goTask() {
             };
             robotUtil.startTask(task)
         } else {
-            toast.show("无站点数据")
+            toast.show(t('index.wzdsj'))
         }
 
     })
@@ -321,17 +329,18 @@ function goTask() {
 
 }
 </script>
-
+    
 <template>
     <div class="curise_cont">
         <div class="cursie_top">
             <div>
-                <div class="mapfont">巡游地图</div>
+                <div class="mapfont">{{$t('index.xydt')}}</div>
                 <div class="emptyline"></div>
             </div>
             <div class="curise_maplist" @click="tank_control">
-                <div v-if="curiseMaps.curiseList.length>0">{{curiseMaps.curiseList[currentmapId].name}}</div>
-                <div>切换</div>
+                <div v-if="curiseMaps.curiseList&&curiseMaps.curiseList.length>0">
+                    {{curiseMaps.curiseList[currentmapId].name}}</div>
+                <div>{{$t('index.qh')}}</div>
             </div>
         </div>
 
@@ -387,18 +396,18 @@ function goTask() {
         <div class="curise_bottom">
             <div class="curise_enter1" @click="tank_control2">
                 <div>
-                    <span v-if="curiseType==0">循环巡游</span>
-                    <span v-if="curiseType==1">按次巡游</span>
+                    <span v-if="curiseType==0">{{$t('index.xhxy')}}</span>
+                    <span v-if="curiseType==1">{{$t('index.acxy')}}</span>
                 </div>
                 <img src="../../assets/img/curisedown.png">
             </div>
-            <div class="curise_enter2 font1" @click="goTask">立即出发</div>
+            <div class="curise_enter2 font1" @click="goTask">{{$t('index.ljcf')}}</div>
         </div>
 
         <!-- //选择巡游图 -->
         <div class="cruise_tank" v-if="showChoicemaptank">
             <div class="curise_mapchoice">
-                <div class="mapchoice_top font6">巡游路线选择</div>
+                <div class="mapchoice_top font6">{{$t('index.xylxxz')}}</div>
                 <div :class="curiseMaps.curiseList.length>4?'mp_content2':'mp_content'">
                     <div v-for="(item,index) in curiseMaps.curiseList" :key="index" @click="choice_map(index)">
                         <div class="font6">{{item.name}}</div>
@@ -409,18 +418,18 @@ function goTask() {
                     </div>
                 </div>
                 <div class="bottbutton">
-                    <div @click="tank_control">取消</div>
-                    <div @click="sel_map">确定</div>
+                    <div @click="tank_control">{{$t('index.qx')}}</div>
+                    <div @click="sel_map">{{$t('index.qd')}}</div>
                 </div>
             </div>
         </div>
         <!-- //选择次数 -->
         <div class="cruise_tank" v-if="showChoicenumtank">
             <div class="curise_mapchoice">
-                <div class="mapchoice_top font6">巡游路线选择</div>
+                <div class="mapchoice_top font6">{{$t('index.xylxxz')}}</div>
                 <div class="xunhuan1" @click="ficcuriseType=0">
                     <div class="font6">
-                        循环巡游
+                        {{$t('index.xhxy')}}
                     </div>
                     <div class="curimg">
                         <img v-if="ficcuriseType==0" src="../../assets/img/language1.png" alt="">
@@ -430,7 +439,7 @@ function goTask() {
                 <div class="number_xun" @click="ficcuriseType=1">
                     <div class="xunhuan1">
                         <div class="font6">
-                            按次巡游
+                            {{$t('index.acxy')}}
                         </div>
                         <div class="curimg">
                             <img v-if="ficcuriseType==1" src="../../assets/img/language1.png" alt="">
@@ -438,7 +447,7 @@ function goTask() {
                         </div>
                     </div>
                     <div class="set_num">
-                        <div class="font6">设置巡游次数</div>
+                        <div class="font6">{{$t('index.szxycs')}}</div>
                         <div>
                             <div class="jian" @click="numDown">-</div>
                             <div class="putnum">
@@ -449,16 +458,16 @@ function goTask() {
                     </div>
                 </div>
                 <div class="bottbutton font7">
-                    <div @click="tank_control2">取消</div>
-                    <div @click="sel_num">确定</div>
+                    <div @click="tank_control2">{{$t('index.qx')}}</div>
+                    <div @click="sel_num">{{$t('index.qd')}}</div>
                 </div>
             </div>
         </div>
     </div>
 </template>
-
-
-
+    
+    
+    
 <style scoped>
 .curise_cont {
     width: 1205px;
@@ -641,7 +650,7 @@ function goTask() {
 .mp_content>div {
     height: 74px;
     width: 451px;
-    border-bottom: 1px solid #efefef;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.3);
     box-sizing: border-box;
     margin: 0 auto;
     text-align: center;
@@ -718,7 +727,7 @@ function goTask() {
     width: 173px;
     height: 50px;
     line-height: 50px;
-    font-weight: bold;
+
     color: #333333;
     text-align: center;
     background: #E5E5E5;
@@ -729,7 +738,6 @@ function goTask() {
     width: 173px;
     height: 50px;
     line-height: 50px;
-    font-weight: bold;
     color: white;
     text-align: center;
     background: #608FFA;
@@ -794,6 +802,7 @@ function goTask() {
     height: 50px;
     background: #CFCFCF;
     border-radius: 6px;
+
 }
 
 .putnum>input {
@@ -806,19 +815,27 @@ function goTask() {
     font-weight: bold;
     color: #666666;
     text-align: center;
+    border-radius: 6px;
 }
 
 .jian {
     width: 76px;
     display: flex;
-    align-content: center;
     justify-content: center;
+    height: 100%;
+    font-size: 45px;
+    font-weight: bold;
+    color: #83A9FF;
 }
 
 .jia {
     width: 76px;
     display: flex;
     justify-content: center;
-    align-items: center;
+    height: 100%;
+    font-size: 45px;
+    font-weight: bold;
+    color: #83A9FF;
 }
 </style>
+    

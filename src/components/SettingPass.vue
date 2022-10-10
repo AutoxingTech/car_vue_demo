@@ -6,21 +6,131 @@ import store from '../store';
 const userstore: any = store()
 const props = defineProps<{
     PasswordControl: boolean,  //显示弹框
+    defautType: number  //0代表正常进去设置  1代表从启动页进去设置
 }>()
-const emits = defineEmits(['passback', 'passin'])
-let tailNum: any = ''
-const refresh_ = ref(true)
+const showerror = ref(false)
+const errorSel = ref(false)
+const emits = defineEmits(['passback', 'passin', "ficback"])
+const tailNum: any = ref([
+    {
+        num: '',
+        sel: true
+    },
+    {
+        num: '',
+        sel: false
+    },
+    {
+        num: '',
+        sel: false
+    },
+    {
+        num: '',
+        sel: false
+    }
+
+])
+let errorshowtime: any = ''
 function numClick(num: number) {
-    tailNum = tailNum + '' + num + ''
-    let password = tailNum.substring(tailNum.length - String(userstore.customSetting.basic.adminPass).length)
-    if (password == userstore.customSetting.basic.adminPass) {
-        tailNum = ''
-        emits('passin')
+    errorSel.value = false
+    if (props.defautType == 0) {
+        //正常设置
+        console.log("正常设置")
+        ComparePasswords(num, userstore.customSetting.basic.adminPass)
+    } else {
+        if (userstore.customSetting && userstore.customSetting.basic && userstore.customSetting.basic.adminPass) {
+            console.log("虚拟设置,已获取到服务器密码")
+            ComparePasswords(num, userstore.customSetting.basic.adminPass)
+        } else {
+            console.log("虚拟设置,无服务器密码 但本地存有密码")
+            if (localStorage.getItem('adminPass')) {
+                ComparePasswords(num, localStorage.getItem('adminPass'))
+            } else {
+                console.log("虚拟设置,无服务器密码 无本地存有密码,使用默认密码")
+                let pass = '9999'
+                ComparePasswords(num, pass)
+            }
+        }
     }
 }
+//输入方法
+function ComparePasswords(num: any, adminPass: any) {
+    let haslast = false
+    for (let k in tailNum.value) {
+        tailNum.value[k].sel = false
+        if (tailNum.value[k].num == '') {
+            haslast = true
+        }
+    }
+
+    if (haslast == false) {
+        tailNum.value[tailNum.value.length - 1].sel = true
+        tailNum.value[tailNum.value.length - 1].num = num
+    }
+    for (let i = 0; i < 4; i++) {
+        if (tailNum.value[i].num === "") {
+            tailNum.value[i].sel = true
+            tailNum.value[i].num = num
+            break;
+        }
+    }
+    let li = []
+    for (let i in tailNum.value) {
+        li.push(tailNum.value[i].num)
+    }
+    let numstr = li.join("")
+    if (numstr.length == 4) {
+        setTimeout(() => {
+            if (numstr == adminPass) {
+                clear()
+                emits('passin')
+            } else {
+                clearTimeout(errorshowtime)
+                showerror.value = true
+                errorSel.value = true
+                errorshowtime = setTimeout(() => {
+                    showerror.value = false
+                }, 1500);
+            }
+        }, 300)
+    }
+}
+//删除
+function del() {
+    errorSel.value = false
+    for (let i = 3; i >= 0; i--) {
+        if (tailNum.value[i].num !== "") {
+            tailNum.value[i].num = ""
+            break;
+        }
+    }
+    for (let k in tailNum.value) {
+        tailNum.value[k].sel = false
+    }
+    for (let i = 0; i < 4; i++) {
+        if (tailNum.value[i].num == "") {
+            tailNum.value[i].sel = true
+            break;
+        }
+    }
+}
+//左上角返回
 function navback() {
-    tailNum = ''
-    emits('passback')
+    if (props.defautType == 0) {
+        clear()
+        emits('passback')
+    } else {
+        emits('ficback')
+    }
+}
+//clear
+function clear() {
+
+    for (let i in tailNum.value) {
+        tailNum.value[i].sel = false
+        tailNum.value[i].num = ''
+    }
+    tailNum.value[0].sel = true
 }
 </script>
 
@@ -28,26 +138,37 @@ function navback() {
     <div class="passbox" v-if="props.PasswordControl">
         <div style="height: 74px;position: absolute;" @click="navback">
             <div class="back_style">
-                退出
+                {{$t('setting.tuichu')}}
             </div>
         </div>
 
-        <div class="kuang1" style="width: 950px;height: 629px;margin: 0 auto;margin-top: 74px; ">
+        <div class="kuang1" style="width: 950px;height: 604px;margin: 0 auto;margin-top: 74px; ">
+            <!-- 顶 -->
             <div class="passtitle">
-                密码验证
+                {{$t('setting.mmyz')}}
             </div>
-            <div class="landscape" style="flex-wrap: wrap;width: 590px;height: 345px;">
+            <!-- 中 -->
+            <div class="enterword">
+                <div v-for="(item,index) in tailNum" :key="index"
+                    :class="item.sel?(errorSel?'hasnum haserro':'hasnum'):''">
+                    {{item.num}}
+                </div>
+            </div>
+
+            <!-- 下 -->
+            <div class="landscape" style="flex-wrap: wrap;width: 740px;height: 390px;">
                 <div v-for="(item,index) in [1,2,3,4,5,6,7,8,9]" class="kg">
                     <div @click="numClick(item)" :class="index==2||index==5||index==8?'kuangnum2':'kuangnum'">{{item}}
                     </div>
                 </div>
-                <div style="width: 175px;margin-right: 32px;"></div>
-                <div @click="numClick(0)" class="kuangnum2">0</div>
-                <div style="width: 175px;"></div>
+                <div style="width: 219px;margin-right: 41px;"></div>
+                <div @click="numClick(0)" class="kuangnum">0</div>
+                <div class="kuangnum2 sx" @click="del">
+                    <img src="../assets/img/cuowu.png" style="width:33px;height: 33px;">
+                </div>
             </div>
-
         </div>
-        <div v-if="refresh_"></div>
+        <div class="error_mask" v-if="showerror">密码错误，请重新输入</div>
     </div>
 </template>
 
@@ -76,11 +197,11 @@ function navback() {
 .kuangnum {
     background-color: #E1E2E3;
     border-radius: 13px;
-    margin-right: 32px;
-    margin-bottom: 19px;
-    width: 175px;
-    height: 101px;
-    line-height: 101px;
+    margin-right: 41px;
+    margin-bottom: 14px;
+    width: 219px;
+    height: 87px;
+    line-height: 87px;
     text-align: center;
     color: white;
     font-size: 38px;
@@ -91,11 +212,11 @@ function navback() {
 .kuangnum:active {
     background-color: #83A9FF;
     border-radius: 13px;
-    margin-right: 32px;
-    margin-bottom: 19px;
-    width: 175px;
-    height: 101px;
-    line-height: 101px;
+    margin-right: 41px;
+    margin-bottom: 14px;
+    width: 219px;
+    height: 87px;
+    line-height: 87px;
     text-align: center;
     color: white;
     font-size: 38px;
@@ -108,10 +229,10 @@ function navback() {
     background-color: #E1E2E3;
     border-radius: 13px;
     margin-right: 0px;
-    margin-bottom: 19px;
-    width: 175px;
-    line-height: 101px;
-    height: 101px;
+    margin-bottom: 14px;
+    width: 219px;
+    height: 87px;
+    line-height: 87px;
     text-align: center;
     font-size: 38px;
     font-weight: bold;
@@ -122,10 +243,10 @@ function navback() {
     background-color: #83A9FF;
     border-radius: 13px;
     margin-right: 0px;
-    margin-bottom: 19px;
-    width: 175px;
-    line-height: 101px;
-    height: 101px;
+    margin-bottom: 14px;
+    width: 219px;
+    height: 87px;
+    line-height: 87px;
     text-align: center;
     font-size: 38px;
     font-weight: bold;
@@ -135,14 +256,13 @@ function navback() {
 
 
 .passtitle {
-    height: 121px;
+    height: 75px;
     width: 100%;
     text-align: center;
-    line-height: 121px;
+    line-height: 75px;
     font-size: 30px;
     font-weight: bold;
     color: #666666;
-    line-height: 121px;
 }
 
 .back_style {
@@ -160,5 +280,70 @@ function navback() {
     left: 22px;
     top: 22px;
 
+}
+
+.enterword {
+    height: 87px;
+    width: 740px;
+    margin-bottom: 28px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.enterword>div {
+    width: 129px;
+    height: 88px;
+    background: #E1E2E3;
+    border-radius: 13px;
+    text-align: center;
+    line-height: 84px;
+    background-color: #E1E2E3;
+    font-weight: bold;
+    color: #666666;
+    font-size: 38px;
+    box-sizing: border-box;
+
+}
+
+.hasnum {
+    width: 129px;
+    height: 88px;
+    line-height: 84px;
+    border: 4px solid #83A9FF;
+    box-sizing: border-box;
+    color: #83A9FF !important;
+}
+
+.haserro {
+    width: 129px;
+    height: 88px;
+    line-height: 84px;
+    border: 4px solid #DC4141;
+    box-sizing: border-box;
+    color: #DC4141 !important;
+}
+
+.error_mask {
+    height: 101px;
+    width: 547px;
+    background: #D31600;
+    opacity: 0.51;
+    border-radius: 15px;
+    position: fixed;
+    bottom: 22px;
+    left: 50%;
+    margin-left: -273.5px;
+    font-size: 30px;
+    font-weight: bold;
+    color: #FFFFFF;
+    text-align: center;
+    line-height: 103px;
+}
+
+.sx {
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 </style>

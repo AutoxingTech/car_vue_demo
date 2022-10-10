@@ -1,12 +1,14 @@
 import router from '../router';
 import { reactive } from "vue";
 import store from "../store";
-import { ControlLoading } from './settingUtil'
+import settingUtil, { ControlLoading } from './settingUtil'
 import { appId, appSecret, robotId, appMode, AXRobot, EmergencyType, MotionType } from "../js/globalConfig";
 import { toast } from "../components/Toast/Toast";
 import { CrashStatus } from '../js/globalData'
 
 export const MinLocQuality = 70  //定位状态 0～100 70以上可用
+
+export const Lowest_power = 19  //低电量
 
 var axRobot: any = null
 var taskStartTimeout: any = null
@@ -17,6 +19,7 @@ var taskId: any = null
 var state: any = {}
 var isEmergencyStop = false
 var isError = false
+let gocharTime: any = ''
 
 export var taskInfo = reactive({
     pallet: [{
@@ -26,7 +29,8 @@ export var taskInfo = reactive({
     list: [{
         name: null,
         status: 0, //0未配送 1正在配送 2已到达 3已完成
-        idx: []//托盘位置
+        idx: [],//托盘位置
+        preGet: false
     }],//取餐按任务排列
     backPt: {
         name: null,
@@ -34,7 +38,7 @@ export var taskInfo = reactive({
         idx: []
     } || null,
     currentTask: {
-        name: null,
+        name: "",
         status: 0,
         idx: []
     } || null,
@@ -130,9 +134,9 @@ const actExe: any = {
                 if (pt.name == name) { //todo 需要改id
                     console.log(name, "出发")
                     pt.status = 1
-                    callBack(14)
                 }
             }
+            callBack(14)
         }
         clearTimeout(actType0Timeout)
         if (taskInfo.runType == 0) {
@@ -159,9 +163,9 @@ const actExe: any = {
                 if (pt.name == name) { //todo 需要改id
                     console.log(name, "达到")
                     pt.status = 2
-                    callBack(16)
                 }
             }
+            callBack(16)
         }
 
         clearTimeout(actType0Timeout)
@@ -219,9 +223,7 @@ const onStateChanged = (data: any) => {
             for (let i in robotstatus) {
                 state.robotstate[i] = robotstatus[i];
             }
-            if(data.vers){
-                state.vers = data.vers.hwVer + ' ' + data.vers.softVer
-            }
+            state.vers = data.vers.hwVer + ' / ' + data.vers.softVer
         })
         state = data
         if (isEmergencyStop != data.isEmergencyStop) {
@@ -246,36 +248,42 @@ const onStateChanged = (data: any) => {
         if (isError == false && data.isTasking && data.moveState == "failed") {
             isError = true
             robotUtil.cancelTask().then(() => {
-                store().$patch((state: any) => {
-                    state.showAbnormal = 1
-                })
+                settingUtil.AbnormalControl(1)
             })
             console.log("===============moveState failed=================")
+        }
+        if (data.battery <= Lowest_power && router.currentRoute.value.path != '/task' && router.currentRoute.value.path != '/starup' && router.currentRoute.value.path != '/crashstop' && router.currentRoute.value.path != '/ficsetting' && data.isCharging == false) {
+            let NowTime = new Date().getTime()
+            if (gocharTime == '' || (Math.abs(NowTime - gocharTime) / 1000) > 60) {
+                gocharTime = NowTime
+                settingUtil.goCharpile(settingUtil.getChargeStation())
+            }
         }
     }
 }
 
 //不处理异常
 const commonR = (promise: any, name: string, reqObj = {}, reqObj2 = {}) => {
-    console.log(name, new Date().getTime(), "__Req:::", reqObj)
+    console.log(name, "__Req:::", reqObj)
     return promise.then((res: any) => {
-        console.log(name, new Date().getTime(), "__res>>>", res)
+        console.log(name, "__res>>>", res)
         return Promise.resolve(res)
     }).catch((err: any) => {
-        console.log(name, new Date().getTime(), "__ERR###", err)
+        console.log(name, "__ERR###", err)
         return Promise.reject(err)
     })
 }
 
 //处理异常
 const commonP = (promise: any, name: string, reqObj = {}, reqObj2 = {}) => {
-    console.log(name, new Date().getTime(), "__Req:::", reqObj, reqObj2)
+    console.log(name, "__Req:::", reqObj, reqObj2)
     return promise.then((res: any) => {
-        console.log(name, new Date().getTime(), "__res>>>", res)
+        console.log(name, "__res>>>", res)
         return Promise.resolve(res)
     }).catch((err: any) => {
         ControlLoading(false)
-        console.log(name, new Date().getTime(), "__ERR###", err)
+        settingUtil.AbnormalControl(1)
+        console.log(name, "__ERR###", err)
         return new Promise(() => { })
     })
 }
@@ -284,7 +292,6 @@ const commonP = (promise: any, name: string, reqObj = {}, reqObj2 = {}) => {
 export const robotUtil = {
 
     init() {
-        console.log(555, appId, appSecret, appMode)
         axRobot = new AXRobot(appId, appSecret, appMode);
         return commonR(axRobot.init(), "axRobot.init")
     },
@@ -302,8 +309,11 @@ export const robotUtil = {
         })
     },
 
-    getToken() {
-        return commonR(axRobot.getToken(), "axRobot.getToken")
+    getToken(appMode: any) {
+        return commonR(axRobot.getToken(appMode), "axRobot.getToken", appMode)
+    },
+    getVersion_P() {
+        return axRobot.getVersion()
     },
 
     getPoiList(reqObj: any) {
@@ -349,19 +359,27 @@ export const robotUtil = {
 
         this.getState_P().then((res: any) => {
             if (res.locQuality > MinLocQuality) {
-                if (res.isManualMode == true || res.isRemoteMode == true) {
-                    return this.motionForAuto().then(() => {
-                        return Promise.resolve(true)
-                    })
+                if (res.battery > Lowest_power) {
+                    if (res.isManualMode == true || res.isRemoteMode == true) {
+                        return this.motionForAuto().then(() => {
+                            return Promise.resolve(1)
+                        })
+                    } else {
+                        return Promise.resolve(1)
+                    }
                 } else {
-                    return Promise.resolve(true)
+                    if (task.runType == 25) {
+                        return Promise.resolve(1)
+                    } else {
+                        return Promise.resolve(3)
+                    }
                 }
             } else {
-                return Promise.resolve(false)
+                return Promise.resolve(2)
             }
 
-        }).then((res: boolean) => {
-            if (res == true) {
+        }).then((res: number) => {
+            if (res == 1) {
                 clearTimeout(taskStartTimeout)
                 taskStartTimeout = setTimeout(() => {
                     console.log("任务发送超时")
@@ -371,15 +389,18 @@ export const robotUtil = {
                 //     this.executeTask(taskId)
                 // })
                 commonP(axRobot.startTask(task), "axRobot.startTask", task)
-            } else {
+            } else if (res == 2) {
                 toast.show("请复位")
+                ControlLoading(false)
+            } else if (res == 3) {
+                toast.show("电量不足")
                 ControlLoading(false)
             }
         })
     },
 
 
-    executeTask(taskId: any) {
+    executeTask() {
         return commonP(axRobot.executeTask(taskId), "axRobot.executeTask", taskId)
     },
 
@@ -427,6 +448,10 @@ export const robotUtil = {
     setUICallBack(callBack: Function) {
         UICallBack = callBack
     },
+
+    setGocharTime() {
+        gocharTime = new Date().getTime()
+    }
 
 }
 

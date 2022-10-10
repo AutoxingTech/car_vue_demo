@@ -43,16 +43,16 @@ const Cruiesechange2 = (e: any) => {
     <div class="cruise_setting2">
         <div>
             <div class="cruise_top">
-                <span class="delive_span1 font4">配送暂停时长</span>
-                <span class="delive_span2">暂停后倒计时时长</span>
+                <span class="delive_span1 font4">{{$t('setting.psztsc')}}</span>
+                <span class="delive_span2">{{$t('setting.zthdjssc')}}</span>
             </div>
             <div class="cruise_bottom">
-                <div>10秒</div>
+                <div>10{{$t('setting.miao')}}</div>
                 <div class="cruise_bottom_center">
                     <VueSlider style="width: 100%;" v-bind="options1" v-model="time1" @change="Cruiesechange1"
                         :tooltip-formatter="`${time1}s`" />
                 </div>
-                <div>1分钟</div>
+                <div>1{{$t('setting.fenzhong')}}</div>
             </div>
         </div>
 
@@ -60,8 +60,8 @@ const Cruiesechange2 = (e: any) => {
 
         <div>
             <div class="cruise_top">
-                <span class="delive_span1 font4">行走速度</span>
-                <span class="delive_span2">设置机器人送物时行驶速度</span>
+                <span class="delive_span1 font4">{{$t('setting.xzsd')}}</span>
+                <span class="delive_span2">{{$t('setting.szjqrswxssd')}}</span>
             </div>
             <div class="cruise_bottom">
                 <div>10cm/s</div>

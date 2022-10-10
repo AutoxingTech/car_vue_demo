@@ -1,11 +1,14 @@
 <script lang="ts" setup>
 import { reactive, ref } from 'vue';
+import store from '../../../store';
+import { useI18n } from 'vue-i18n'
+const useStore: any = store()
 
 const props = defineProps<{
     controlType: number,  //显示的是那个弹框 1字号大小选择
     fontSizetype: number,  //字号
     patternList: any,  //模式列表
-    Defaultdisplay: number //默认显示tab下标
+    Defaultdisplay: any //默认显示tab下标
     guideplaytype: number,//引领默认显示
     StandbyPointList: any, //待命点列表
     Defaultstandby: any, //默认待命点
@@ -16,15 +19,15 @@ const emits = defineEmits(['TankControl', 'change-font', 'change-tab', 'change-g
 //字号列表
 const fontSize = reactive([
     {
-        name: '小号字体',
+        name: 'setting.xhzt',
         sizetype: 0
     },
     {
-        name: '中号字体',
+        name: 'setting.zhzt',
         sizetype: 1
     },
     {
-        name: '大号字体',
+        name: 'setting.dhzt',
         sizetype: 2
     }
 ])
@@ -51,7 +54,7 @@ const ChargingPileList: any = reactive(props.ChargingPileList)
 const Defaultcharplie = ref(props.Defaultcharplie)
 
 const fontSizetype = ref(props.fontSizetype)
-const Defaultdisplay = ref(props.fontSizetype)
+const Defaultdisplay = ref(props.Defaultdisplay)
 const guideplaytype = ref(props.guideplaytype)
 const Changefont = (e: number) => {
     fontSizetype.value = e
@@ -59,6 +62,9 @@ const Changefont = (e: number) => {
 const Changedefauttab = (item: any, e: number) => {
     if (item.sel) {
         Defaultdisplay.value = e
+        useStore.$patch((state: any) => {
+            state.customSetting.basic.currenttab = e
+        })
     }
 }
 const Changeguideplay = (e: number) => {
@@ -78,6 +84,9 @@ const LastChange_font = () => {
 const LastCancle_tab = () => {
     const index = props.Defaultdisplay
     Defaultdisplay.value = index
+    useStore.$patch((state: any) => {
+        state.customSetting.basic.currenttab = index
+    })
     emits('TankControl', 0)
 }
 //确定更改默认显示tab
@@ -137,81 +146,90 @@ const LastChange_char = () => {
     <div class="base_mask" v-if="controlType!=0">
         <!-- 字体选择 -->
         <div class="guide_contnet" v-if="controlType==1">
-            <div class="guide_tip_top font6">文字设置</div>
-            <div class="guide_tipone font6" v-for="(item,index) in fontSize" :key="index"
-                @click="Changefont(item.sizetype)">
-                <div class="font6">
-                    {{item.name}}
-                </div>
-                <div class="">
-                    <img v-if="fontSizetype==item.sizetype" src="../../../assets/img/language1.png" alt="">
-                    <img v-else src="../../../assets/img/selout.png" alt="">
+            <div class="guide_tip_top font6">{{$t('setting.ztsz')}}</div>
+            <div class="one_all">
+                <div class="guide_tipone font6" v-for="(item,index) in fontSize" :key="index"
+                    @click="Changefont(item.sizetype)">
+                    <div class="font6">
+                        {{$t(item.name)}}
+                    </div>
+                    <div class="">
+                        <img v-if="fontSizetype==item.sizetype" src="../../../assets/img/language1.png" alt="">
+                        <img v-else src="../../../assets/img/selout.png" alt="">
+                    </div>
                 </div>
             </div>
             <div class="base_tip_meth font7">
-                <div @click="LastCancle_font">取消</div>
-                <div @click="LastChange_font">确定</div>
+                <div @click="LastCancle_font">{{$t('index.qx')}}</div>
+                <div @click="LastChange_font">{{$t('index.qd')}}</div>
             </div>
 
         </div>
         <!-- 主页模式选择 -->
         <div class="guide_contnet" v-if="controlType==2">
-            <div class="guide_tip_top font6">主页模式设置</div>
-            <div class="guide_tipone" v-for="(item,index) in patternList" :key="index"
-                @click="Changedefauttab(item,index)">
-                <div :class="item.sel?'font6':'grayfont font6'">
-                    {{item.name}}
-                </div>
-                <div class="">
-                    <img v-if="index==Defaultdisplay" src="../../../assets/img/language1.png" alt="">
-                    <img v-else src="../../../assets/img/selout.png" alt="">
+            <div class="guide_tip_top font6">{{$t('setting.zymssz')}}</div>
+            <div class="one_all">
+                <div class="guide_tipone" v-for="(item,index) in patternList" :key="index"
+                    @click="Changedefauttab(item,index)">
+                    <div :class="item.sel?'font6':'grayfont font6'">
+                        {{$t(item.name)}}
+                    </div>
+                    <div class="">
+                        <img v-if="index==useStore.customSetting.basic.currenttab"
+                            src="../../../assets/img/language1.png" alt="">
+                        <img v-else src="../../../assets/img/selout.png" alt="">
+                    </div>
                 </div>
             </div>
             <div class="base_tip_meth font7">
-                <div @click="LastCancle_tab">取消</div>
-                <div @click="LastChange_tab()">确定</div>
+                <div @click="LastCancle_tab">{{$t('index.qx')}}</div>
+                <div @click="LastChange_tab()">{{$t('index.qd')}}</div>
             </div>
 
         </div>
 
         <!-- 待命点选择选择 -->
         <div class="guide_contnet" v-if="controlType==3">
-            <div class="guide_tip_top font6">待命点选择</div>
-            <div :class="StandbyPointList.length>4?'scrolstyl':'normalstyl'">
-                <div class="guide_tipone" v-for="(item,index) in StandbyPointList" :key="index"
-                    @click="Changestandby(item,index)">
-                    <div class="font6">
-                        {{item.name}}
-                    </div>
-                    <div class="">
-                        <img v-if="item.id==Defaultstandby" src="../../../assets/img/language1.png" alt="">
-                        <img v-else src="../../../assets/img/selout.png" alt="">
+            <div class="guide_tip_top font6">{{$t('setting.dmdxz')}}</div>
+            <div class="one_all">
+                <div :class="StandbyPointList.length>4?'scrolstyl':''">
+                    <div class="guide_tipone" v-for="(item,index) in StandbyPointList" :key="index"
+                        @click="Changestandby(item,index)">
+                        <div class="font6">
+                            {{item.name}}
+                        </div>
+                        <div class="">
+                            <img v-if="item.id==Defaultstandby" src="../../../assets/img/language1.png" alt="">
+                            <img v-else src="../../../assets/img/selout.png" alt="">
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="base_tip_meth font7">
-                <div @click="LastCancle_stand">取消</div>
-                <div @click="LastChange_stand()">确定</div>
+                <div @click="LastCancle_stand">{{$t('index.qx')}}</div>
+                <div @click="LastChange_stand()">{{$t('index.qd')}}</div>
             </div>
         </div>
 
         <!-- 引领默认播放内容 -->
         <div class="guide_contnet" v-if="controlType==4">
-            <div class="guide_tip_top font6">引领内容</div>
-            <div class="guide_tipone" v-for="(item,index) in guideList" :key="index" @click="Changeguideplay(item.id)">
-                <div class="font6">
-                    {{item.name}}
-                </div>
-                <div class="">
-                    <img v-if="item.id==guideplaytype" src="../../../assets/img/language1.png" alt="">
-                    <img v-else src="../../../assets/img/selout.png" alt="">
+            <div class="one_all">
+                <div class="guide_tip_top font6">{{$t('setting.ylnr')}}</div>
+                <div class="guide_tipone" v-for="(item,index) in guideList" :key="index"
+                    @click="Changeguideplay(item.id)">
+                    <div class="font6">
+                        {{item.name}}
+                    </div>
+                    <div class="">
+                        <img v-if="item.id==guideplaytype" src="../../../assets/img/language1.png" alt="">
+                        <img v-else src="../../../assets/img/selout.png" alt="">
+                    </div>
                 </div>
             </div>
 
-
             <div class="base_tip_meth font7">
-                <div @click="LastCancle_guide">取消</div>
-                <div @click="LastChange_guide">确定</div>
+                <div @click="LastCancle_guide">{{$t('index.qx')}}</div>
+                <div @click="LastChange_guide">{{$t('index.qd')}}</div>
             </div>
 
         </div>
@@ -219,22 +237,24 @@ const LastChange_char = () => {
 
         <!-- 充电桩选择选择 -->
         <div class="guide_contnet" v-if="controlType==5">
-            <div class="guide_tip_top font6">充电桩选择</div>
-            <div :class="ChargingPileList.length>4?'scrolstyl':'normalstyl'">
-                <div class="guide_tipone" v-for="(item,index) in ChargingPileList" :key="index"
-                    @click="Changechar(item,index)">
-                    <div class="font6">
-                        {{item.name}}
-                    </div>
-                    <div class="">
-                        <img v-if="item.id==Defaultcharplie" src="../../../assets/img/language1.png" alt="">
-                        <img v-else src="../../../assets/img/selout.png" alt="">
+            <div class="guide_tip_top font6">{{$t('setting.cdzxz')}}</div>
+            <div class='one_all'>
+                <div :class="ChargingPileList.length>4?'scrolstyl':''">
+                    <div class="guide_tipone" v-for="(item,index) in ChargingPileList" :key="index"
+                        @click="Changechar(item,index)">
+                        <div class="font6">
+                            {{item.name}}
+                        </div>
+                        <div class="">
+                            <img v-if="item.id==Defaultcharplie" src="../../../assets/img/language1.png" alt="">
+                            <img v-else src="../../../assets/img/selout.png" alt="">
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="base_tip_meth font7">
-                <div @click="LastCancle_char">取消</div>
-                <div @click="LastChange_char">确定</div>
+                <div @click="LastCancle_char">{{$t('index.qx')}}</div>
+                <div @click="LastChange_char">{{$t('index.qd')}}</div>
             </div>
         </div>
 
@@ -275,8 +295,21 @@ const LastChange_char = () => {
     padding-bottom: 20px;
 }
 
+.one_all {
+    width: 485px;
+    border-radius: 15px;
+    margin: 0 auto;
+    max-height: 245px;
+    overflow: hidden;
+    background-color: white;
+}
+
+.one_all>div:last-child {
+    border-bottom: none;
+}
+
 .guide_tipone {
-    height: 57px;
+    height: 60px;
     display: flex;
     justify-content: center;
     width: 444px;
@@ -284,6 +317,7 @@ const LastChange_char = () => {
     margin: 0 auto;
     align-items: center;
     justify-content: space-between;
+    box-sizing: border-box;
 }
 
 .guide_tipone>div {
@@ -335,13 +369,13 @@ const LastChange_char = () => {
 }
 
 .scrolstyl {
-    max-height: 230px;
+    max-height: 245px;
     overflow-y: scroll;
+    background-color: white;
+    width: 100%;
 }
 
 .scrolstyl>div:last-child {
     border-bottom: none;
 }
-
-.normalsty {}
 </style>

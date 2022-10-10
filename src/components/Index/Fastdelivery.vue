@@ -1,7 +1,7 @@
 
 <script lang="ts">
 import { defineComponent } from 'vue';
-import { audioMode } from "../../js/globalConfig"
+import { audioMode, ActionType } from "../../js/globalConfig"
 import { toast } from '../Toast/Toast';
 export default defineComponent({
     beforeRouteEnter(to, from, next) {
@@ -32,18 +32,23 @@ export default defineComponent({
 
                 }
             }
+
+            instance.initscroll()
         });
     },
 });
 </script>
 <script setup lang="ts">
-import { ref, reactive, nextTick, onMounted } from 'vue'
+import { ref, reactive } from 'vue'
 import 'swiper/css';
 import { Swiper, SwiperSlide } from 'swiper/vue';
-import { tables, poiMap, EffectivFloor, currentfloor } from '../../js/Datacollation'
+import { tables, poiMap } from '../../js/Datacollation'
 import store from '../../store';
 import { robotUtil, taskInfo } from '../../js/robotUtil';
 import settingUtil from "../../js/settingUtil"
+import { useI18n } from 'vue-i18n'
+let lightlist: any = []
+const { t } = useI18n()
 
 
 const userstore: any = store()
@@ -54,74 +59,75 @@ const floorlist1: any = tabMessage.floorlist //餐桌楼层
 const floorlist2: any = tabMessage.floorlist2  //包间楼层
 let curSwiper: any = null; //餐厅swiper的对象
 let curSwiper2: any = null; //包间swiper的对象
-const ficpallet: any = reactive([
+
+const ficpallet: any = [
     {
         sel: false,
         taskStatus: 0,
-        table: null,
-        show: true
+        table: null
     }, {
         sel: false,
         taskStatus: 0,
-        table: null,
-        show: true
+        table: null
     }, {
         sel: false,
         taskStatus: 0,
-        table: null,
-        show: true
+        table: null
     },
     {
         sel: false,
         taskStatus: 0,
-        table: null,
-        show: true
+        table: null
     }
-])
+]
 
 const pallet: any = reactive([])
+
 //设置左侧托盘展示
 function setpallent() {
-    ficpallet.forEach((item: any) => {
-        item.show = true
-    })
-    pallet.splice(0, pallet.length)
-    //根据设置托盘数进行展示
-    for (let i in userstore.customSetting.delivery.pallet) {
-        if (userstore.customSetting.delivery.pallet[i] == 0) {
-            ficpallet[i].show = false
-            if (ficpallet[i].table) {
-                ficpallet[i].table.select = false
-            }
 
+    const LightsLong = 76  //灯带总长度为76
+    const SingleLight = LightsLong / 23
+    let palletfic: any = userstore.customSetting.delivery.pallet  //用于判断当前托盘层的灯带数量
+    const sum = palletfic.reduce((pre: number, item: any) => {
+        return pre + parseInt(item)
+    }, 0)
+    //防止默认设置 大于76后导致错误
+    if (sum > LightsLong) {
+        palletfic = [20, 20, 20, 0]
+    }
+    let lightStartCM = 0;
+    let lightEndCM = 0
+    let palletxx = [].concat(pallet)
+    pallet.splice(0, pallet.length)
+    lightlist = []
+    for (let i = 0; i < palletfic.length; i++) {
+        lightEndCM += lightStartCM + palletfic[i]
+        lightStartCM = lightEndCM - palletfic[i]
+        if (palletfic[i] > 0) {
+            lightlist.push(parseInt((lightEndCM / SingleLight) + "") - parseInt((lightStartCM / SingleLight) + ""))
+            pallet.push(ficpallet[lightlist.length - 1])
         }
     }
-    //去除等于show==fasle托盘
-    for (let i in ficpallet) {
-        if (ficpallet[i].show) {
-            pallet.push(ficpallet[i])
+    if (palletxx.length != pallet.length) {
+        for (let p of palletxx) {
+            delectcurrent(p)
         }
+        revise(pallet[0])
     }
-    let hascheak = false
-    for (let i in pallet) {
-        if (pallet[i].sel == true) {
-            hascheak = true
-        }
-    }
-    if (!hascheak) {
-        pallet[0].sel = true
-    }
+    console.log("--setpallent---", lightlist, pallet)
 }
 setpallent()
 //将swiepr展示的楼层设为高亮
 function computeFloor() {
     let ficlist = currentType.value == 1 ? floorlist1 : floorlist2
     let ficfloor = currentType.value == 1 ? tabMessage.boardlist[tabMessage.swipertab][0].floor : tabMessage.boardlist2[tabMessage.swipertab2][0].floor
-    for (let i of ficlist) {
-        if (i.name == ficfloor) {
-            i.sel = true
+    for (let i in ficlist) {
+        if (ficlist[i].name == ficfloor) {
+            ficlist[i].sel = true
+            setcurrent(Number(i))
         } else {
-            i.sel = false
+            ficlist[i].sel = false
         }
     }
 }
@@ -227,15 +233,18 @@ function delectcurrent(item: any) {
 
 //灯带数据
 function lightcalculation(arr: any) {
-    let palletfic: any = userstore.customSetting.delivery.pallet  //用于判断当前托盘层的灯带数量
-    console.log("palletfic", palletfic)
     let lights = []
     for (let i of arr) {
+        let idx = 0
+        for (let j = 0; j < i; j++) {
+            idx += parseInt(lightlist[j])
+        }
         lights.push({
-            "index": i,
-            "num": palletfic[i]
+            "index": idx,
+            "num": lightlist[i]
         })
     }
+    console.log(111111, lights)
     return lights;
 }
 //背景声音数据
@@ -248,16 +257,27 @@ function volumeculation(e: any) {
     let Fobj: any = {
         mode: audioMode,
         audioId: "3111002",//您的餐到了
-        url: currentcast ? currentcast.fileUrl : null,
+        num: 1,
         volume: userstore.customSetting.sound.switchon ? userstore.customSetting.sound.voiceVolume : 0,
-        interval: currentcast ? currentcast.ruleInterval : -1,
-        duration: currentcast ? currentcast.ruleDuration : -1,
+        interval: -1,
+        duration: -1,
+    }
+    if (currentcast) {
+        Fobj.url = currentcast.fileUrl
+        Fobj.interval = currentcast.ruleInterval
+        // 1 按播报次数  2按照播报时间
+        if (currentcast.ruleType == 1) {
+            Fobj.num = currentcast.ruleCount
+        } else if (currentcast.runType == 2) {
+            Fobj.duration = currentcast.ruleDuration
+        }
     }
     return Fobj
 }
 
 //去任务
 function goTask() {
+    console.log("111",ActionType.InterAction,ActionType.InterAction)
     let list = []
     let palletmap: any = {} //站点与托盘的一对多关系
     for (let i = 0; i < pallet.length; i++) {
@@ -290,20 +310,37 @@ function goTask() {
                 x: poi.coordinate[0],
                 y: poi.coordinate[1],
                 yaw: poi.yaw,
+                areaId: poi.areaId,
                 ext: {
                     name: poi.name,
                     id: poi.id,
-                    areaId: poi.areaId,
                     idx: palletmap[poi.id + ""],
                     len: pallet.length
                 },
                 stepActs: [
                     {
-                        type: 5,//本地音频
+                        type: ActionType.PlayAudio,//本地音频
                         data: volumeculation(poi.id)
                     },
+                    // {
+                    //     type: ActionType.Pause,   //到达停留时间
+                    //     data: {
+                    //         pauseTime: 14
+                    //     }
+                    // },
+                    // {
+                    //     type: ActionType.PlayAudio,//本地音频
+                    //     data: {
+                    //         mode: audioMode,
+                    //         audioId: "3111004",//请关闭箱门后点击立即取餐
+                    //         num: 999,
+                    //         volume: userstore.customSetting.sound.switchon ? userstore.customSetting.sound.voiceVolume : 0,
+                    //         interval: -1,
+                    //         duration: -1
+                    //     }
+                    // },
                     {
-                        type: 37, //灯带控制
+                        type: ActionType.OpenLight, //灯带控制
                         data: {
                             mode: 1,//"color":1, //颜色  1红色 3绿色 4蓝色 5黄色 
                             color: 1,
@@ -312,13 +349,30 @@ function goTask() {
                     },
                     //等待交互
                     {
-                        type: 40
+                        type: ActionType.InterAction
+                    },
+                    {
+                        type: ActionType.StopAudio,
+                        data: {
+                            mode: audioMode
+                        }
+                    },
+                    {
+                        type: ActionType.PlayAudio,//本地音频
+                        data: {
+                            mode: audioMode,
+                            audioId: "3111007",//客官请慢慢享用您的美食，我要继续工作了
+                            num: 1,
+                            volume: userstore.customSetting.sound.switchon ? userstore.customSetting.sound.voiceVolume : 0,
+                            interval: -1,
+                            duration: -1
+                        }
                     },
                     //关闭灯带
                     {
-                        type: 38,
+                        type: ActionType.CloseLight,
                         data: {
-                            mode: 1,
+                            mode: audioMode,
                             color: 4
                         }
                     },
@@ -329,13 +383,14 @@ function goTask() {
     if (pts.length > 0) {
         let standby = settingUtil.getStandbyStation()
         let backPt = {
+            type: standby.type,
             x: standby.coordinate[0],
             y: standby.coordinate[1],
             yaw: standby.yaw,
+            areaId: standby.areaId,
             ext: {
                 name: "返航中",//standby.name,
-                id: standby.id,
-                areaId: standby.areaId
+                id: standby.id
             },
             stepActs: [],
         }
@@ -346,7 +401,7 @@ function goTask() {
             },
             stepActs: [
                 {
-                    type: 5,//本地音频
+                    type: ActionType.PlayAudio,//本地音频
                     data: {
                         mode: audioMode,
                         audioId: "3111012",//"小舟要出发送餐了，请让一让"
@@ -358,7 +413,7 @@ function goTask() {
                     },
                 },
                 {
-                    type: 5,//背景音乐
+                    type:  ActionType.PlayAudio,//背景音乐
                     data: {
                         mode: audioMode,
                         audioId: settingUtil.getbackgroundSong(),
@@ -370,7 +425,7 @@ function goTask() {
                     },
                 },
                 {
-                    type: 41,  //设置速度
+                    type: ActionType.SetSpeed,  //设置速度
                     data: {
                         speed: userstore.customSetting.delivery.runSpeed / 100
                     }
@@ -382,34 +437,36 @@ function goTask() {
             name: "快捷任务" + new Date().getTime(),
             runNum: 1,
             taskType: 2,
+            routeMode: 2,
             runType: 20,
             curPt: curPt,
             pts: pts,
             backPt: backPt
         };
         robotUtil.startTask(task)
+        console.log(task, "数据")
     } else {
-        toast.show('未选择站点')
+        toast.show(t('index.wxzzd'))
     }
 }
-// for (let i in EffectivFloor) {
-//     if (currentfloor == EffectivFloor[i]) {
-//         console.log(i)
-//         if (Number(i) > 3) {
-//             tabMessage.floorlist1scroll = true
-//             nextTick(function () {
-//                 var element1 = document.getElementById("id" + (Number(i) + Number(1)))
-//                 console.log(element1, "element")
-//                 if (element1) {
-//                     element1.scrollIntoView({ block: 'start', behavior: "smooth" });
-//                 }
-//             })
 
-//         }
-//     }
-// }
-
-defineExpose({ pallet, setpallent, delectcurrent, userstore, revise });
+//滚动到当前位置
+function setcurrent(i: number) {
+    var element1 = document.getElementById("id" + (Number(i)))
+    if (element1) {
+        element1.scrollIntoView({ block: 'center', inline: 'center', behavior: 'auto' })
+    }
+}
+//初始化滚动条
+function initscroll() {
+    let ficlist = currentType.value == 1 ? floorlist1 : floorlist2
+    for (let i in ficlist) {
+        if (ficlist[i].sel) {
+            setcurrent(Number(i))
+        }
+    }
+}
+defineExpose({ pallet, setpallent, delectcurrent, userstore, revise, initscroll });
 </script>
 
 <template>
@@ -418,7 +475,7 @@ defineExpose({ pallet, setpallent, delectcurrent, userstore, revise });
         <div class="index_left">
             <div class="index_left_top">
                 <div></div>
-                <div>托盘层</div>
+                <div>{{$t('index.tpc')}}</div>
                 <div></div>
             </div>
             <!-- 托盘层 -->
@@ -430,59 +487,65 @@ defineExpose({ pallet, setpallent, delectcurrent, userstore, revise });
                     </div>
                     <img src="../../assets/img/fastdeveryico1.png" @click.stop="delectcurrent(item)">
                 </div>
-                <div v-if="!item.table && item.sel" class="layer3 font3">(请选择点位)</div>
-                <div v-if="!item.table && !item.sel" class="layer4 font3">点选点位</div>
+                <div v-if="!item.table && item.sel" class="layer3 font3">({{$t('index.qxzdw')}})</div>
+                <div v-if="!item.table && !item.sel" class="layer4 font3">{{$t('index.dxdw')}}</div>
                 <div class="layer5"></div>
             </div>
         </div>
         <div class="index_right" id="floorid">
             <div class="index_right_top">
                 <!-- 餐厅的楼层循环选择 begin-->
-                <div class="floor_content" v-if="currentType == 1">
-                    <div class="floor_list"
+                <div :class="floorlist1.length>0?'floor_content':'floor_content2'" v-if="currentType == 1">
+                    <!-- <div class="floor_list"
                         v-if="floorlist1.length <= 4 || (floorlist1.length > 4 && !tabMessage.floorlist1scroll)">
                         <div :class="item.sel ? 'one_floor' : 'nosel_floor'" @click="floorTap(item.name)"
                             v-for="(item, index) in floorlist1.slice(0, 4)" :key="index">{{ item.name }}</div>
-                    </div>
-                    <div class="floor_list2" v-if="floorlist1.length > 4 && tabMessage.floorlist1scroll">
-                        <div :class="item.sel ? 'one_floor' : 'nosel_floor'" v-for="(item, index) in floorlist1"
-                            @click="floorTap(item.name)" :key="index">{{ item.name
+                    </div> -->
+                    <div class="floor_list2" v-if="floorlist1.length>0">
+                        <div :id="'id'+index" :class="item.sel ? 'one_floor' : 'nosel_floor'"
+                            v-for="(item, index) in floorlist1" @click="floorTap(item.name)" :key="index">{{ item.name
                             }}</div>
                     </div>
-                    <div class="more" v-if="floorlist1.length > 4 && !tabMessage.floorlist1scroll"
-                        @click="showMorefloor()">更多</div>
+                    <!-- <div class="more" v-if="floorlist1.length > 4 && !tabMessage.floorlist1scroll"
+                        @click="showMorefloor()">更多</div> -->
                 </div>
                 <!-- 餐厅的楼层循环选择 end-->
 
                 <!-- 包间的楼层循环选择 begin-->
-                <div class="floor_content" v-if="currentType == 2">
-                    <div class="floor_list"
+                <div :class="floorlist2.length>0?'floor_content':'floor_content2'" v-if="currentType == 2">
+                    <!-- <div class="floor_list"
                         v-if="floorlist2.length <= 4 || (floorlist2.length > 4 && !tabMessage.floorlist2scroll)">
                         <div :class="item.sel ? 'one_floor' : 'nosel_floor'" @click="floorTap(item.name)"
                             v-for="(item, index) in floorlist2.slice(0, 4)" :key="index">{{ item.name }}</div>
-                    </div>
-                    <div class="floor_list2" v-if="floorlist2.length > 4 && tabMessage.floorlist2scroll">
-                        <div :class="item.sel ? 'one_floor' : 'nosel_floor'" v-for="(item, index) in floorlist2"
-                            @click="floorTap(item.name)" :key="index">{{ item.name
+                    </div> -->
+                    <div class="floor_list2">
+                        <div :id="'id'+index" :class="item.sel ? 'one_floor' : 'nosel_floor'"
+                            v-for="(item, index) in floorlist2" @click="floorTap(item.name)" :key="index">{{ item.name
                             }}</div>
                     </div>
-                    <div class="more" v-if="floorlist2.length > 4 && !tabMessage.floorlist2scroll"
-                        @click="showMorefloor()">更多</div>
+                    <!-- <div class="more" v-if="floorlist2.length > 4 && !tabMessage.floorlist2scroll"
+                        @click="showMorefloor()">更多</div> -->
                 </div>
                 <!-- 包间的楼层循环选择 end-->
                 <div class="sel_type">
                     <div @click="currentType = 1" :class="currentType == 1 ? 'left_content_in' : 'left_content_out'">
-                        选餐桌
+                        {{$t('index.xcz')}}
                     </div>
                     <div @click="currentType = 2" :class="currentType == 2 ? 'right_content_in' : 'right_content_out'">
-                        选包间
+                        {{$t('index.xbj')}}
                     </div>
                 </div>
             </div>
             <!-- 餐厅点位循环 start -->
             <div class="index_right_center">
                 <div class="left_pre">
-                    <span @click="swiperPrev" class="swiper-button-prev"></span>
+                    <span @click="swiperPrev" v-if="currentType==1&&floorlist1.length>0"
+                        :style="tabMessage.swipertab==0?'border-right-color: #C6C6C6 !important;':'border-right-color: #83A9FF !important;'"
+                        class="swiper-button-prev"></span>
+
+                    <span @click="swiperPrev" v-if="currentType==2&&floorlist2.length>0"
+                        :style="tabMessage.swipertab2==0?'border-right-color: #C6C6C6 !important;':'border-right-color: #83A9FF !important;'"
+                        class="swiper-button-prev"></span>
                 </div>
 
                 <!-- 餐桌点位选择 start-->
@@ -498,6 +561,14 @@ defineExpose({ pallet, setpallent, delectcurrent, userstore, revise });
                                 </div>
                             </swiper-slide>
                         </swiper>
+                    </div>
+
+                    <div class="dots">
+                        <div class="dotscontent">
+                            <div v-for="(item, index) in tabMessage.boardlist"
+                                :class="index == tabMessage.swipertab ? 'one_dot' : 'one_dot2'">
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <!-- 餐桌选择 end-->
@@ -516,16 +587,33 @@ defineExpose({ pallet, setpallent, delectcurrent, userstore, revise });
                             </swiper-slide>
                         </swiper>
                     </div>
+
+                    <div class="dots">
+                        <div class="dotscontent">
+                            <div v-for="(item, index) in tabMessage.boardlist2"
+                                :class="index == tabMessage.swipertab2 ? 'one_dot' : 'one_dot2'">
+                            </div>
+                        </div>
+                    </div>
                 </div>
+
+
+
                 <div class="right_pre">
-                    <span @click="swiperNext" class="swiper-button-next"></span>
+                    <span @click="swiperNext" v-if="currentType==1&&floorlist1.length>0"
+                        :style="tabMessage.swipertab==tabMessage.boardlist.length-1?'border-left-color: #C6C6C6 !important;':'border-left-color: #83A9FF !important;'"
+                        class="swiper-button-next"></span>
+
+                    <span @click="swiperNext" v-if="currentType==2&&floorlist2.length>0"
+                        :style="tabMessage.swipertab2==tabMessage.boardlist2.length-1?'border-left-color: #C6C6C6 !important;':'border-left-color: #83A9FF !important;'"
+                        class="swiper-button-next"></span>
                 </div>
             </div>
 
 
             <div class="index_right_bottom font1" @click="goTask">
-                <span v-if="userstore.isModify">修改任务</span>
-                <span v-else>立即出发</span>
+                <span v-if="userstore.isModify">{{$t('index.xgrw')}}</span>
+                <span v-else>{{$t('index.ljcf')}}</span>
             </div>
         </div>
     </div>
@@ -669,10 +757,17 @@ page {
     padding: 0 23px 0 16px;
 }
 
+.floor_content2 {
+    background-color: #F1F2F6;
+}
+
 .floor_list {
-    /* width: 278px; */
+    max-width: 278px;
     height: 36px;
     display: flex;
+    overflow-x: scroll;
+    display: -webkit-box;
+    white-space: nowrap;
 
 }
 
@@ -681,11 +776,13 @@ page {
 }
 
 .floor_list2 {
-    max-width: 332px;
+    /* max-width: 332px; */
+    max-width: 278px;
     height: 36px;
     overflow-x: scroll;
     display: -webkit-box;
     white-space: nowrap;
+
 }
 
 .floor_list2>div:last-child {
@@ -730,7 +827,7 @@ page {
     width: 220px;
     height: 75px;
     font-size: 23px;
-    line-height: 75px;
+    line-height: 68px;
     background-color: #83A9FF;
     color: #FFFFFF;
     border-radius: 17px;
@@ -741,6 +838,7 @@ page {
     font-weight: bold;
     position: relative;
     border: 3px solid #83A9FF;
+    box-sizing: border-box;
 
 }
 
@@ -748,7 +846,7 @@ page {
     width: 220px;
     height: 75px;
     font-size: 23px;
-    line-height: 75px;
+    line-height: 68px;
     border: 3px solid #83A9FF;
     border-radius: 17px;
     transform: perspective(45px)scale(1.0, 1.0) rotateX(-4deg);
@@ -757,7 +855,7 @@ page {
     color: #83A9FF;
     font-weight: bold;
     text-align: center;
-    /* box-sizing: border-box; */
+    box-sizing: border-box;
 
 }
 

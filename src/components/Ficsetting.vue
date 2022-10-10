@@ -1,3 +1,23 @@
+
+<script lang="ts">
+import { defineComponent } from 'vue';
+export default defineComponent({
+    beforeRouteEnter(to, from, next) {
+        next((vm) => {
+            const instance: any = vm
+            if (instance.useStore.showAbnormal == 1) {
+                settingUtil.AbnormalControl(0)
+            }
+
+            if (from.fullPath == '/starup') {
+                instance.PasswordControl = true
+            }
+        });
+    },
+});
+</script>
+
+
 <script setup lang="ts">
 import router from '../router';
 import { ref, reactive, onMounted } from 'vue'
@@ -6,6 +26,7 @@ import { OpenSetting } from '../js/android';
 import store from '../store';
 import { toast } from './Toast/Toast';
 import { AppMode, devurl, disurl, storage_key_url, storage_key_app_mode, storage_key_sn } from '../js/globalConfig';
+import SettingPassVue from './SettingPass.vue'
 
 
 const useStore = store()
@@ -22,44 +43,44 @@ function exitSetting() {
     }
 }
 
-
+const PasswordControl = ref(true)
 const showTapApk = ref(false)
 const current_Set = ref(4)
 const setList: any = [
     {
         id: 0,
-        name: '基础设置',
+        name: 'setting.jcsz',
         img: new URL('../assets/img/setleft1sel.png', import.meta.url),
         img2: new URL('../assets/img/setleft1nosel.png', import.meta.url),
     },
     {
         id: 1,
-        name: '声音设置',
+        name: 'setting.sysz',
         img: new URL('../assets/img/setleft2sel.png', import.meta.url),
         img2: new URL('../assets/img/setleft2nosel.png', import.meta.url),
     },
     {
         id: 2,
-        name: '送餐设置',
+        name: 'setting.scsz',
         img: new URL('../assets/img/setleft3sel.png', import.meta.url),
         img2: new URL('../assets/img/setleft3nosel.png', import.meta.url),
     },
     {
         id: 3,
-        name: '巡游设置',
+        name: 'setting.xysz',
         img: new URL('../assets/img/setleft4sel.png', import.meta.url),
         img2: new URL('../assets/img/setleft4nosel.png', import.meta.url),
     },
     {
         id: 4,
-        name: '系统设置',
+        name: 'starup.xtsz',
         img: new URL('../assets/img/setleft5sel.png', import.meta.url),
         img2: new URL('../assets/img/setleft5nosel.png', import.meta.url),
     }
 ]
 const modetype: any = reactive([{
     id: 1,
-    name: '自动模式',
+    name: 'setting.zdms',
     sel: false,
     img1: new URL('../assets/img/sys_1notsel.png', import.meta.url),  //未选中
     img2: new URL('../assets/img/sys_1notsel.png', import.meta.url),  //选中
@@ -67,33 +88,33 @@ const modetype: any = reactive([{
 },
 {
     id: 2,
-    name: '手动模式',
+    name: 'setting.sdms',
     sel: false,
     img1: new URL('../assets/img/sys_2.png', import.meta.url),  //未选中
     img2: new URL('../assets/img/sys_2.png', import.meta.url),
 },
 {
     id: 3,
-    name: '重启APP',
+    name: 'setting.cqapp',
     sel: true,
     img1: new URL('../assets/img/sys_3.png', import.meta.url),
     img2: new URL('../assets/img/sys_3.png', import.meta.url),
 }, {
     id: 4,
-    name: '充电桩复位',
+    name: 'setting.cdzfw',
     sel: false,
     img1: new URL('../assets/img/sys_4.png', import.meta.url),
     img2: new URL('../assets/img/sys_4.png', import.meta.url),
 
 }, {
     id: 5,
-    name: '系统设置',
+    name: 'starup.xtsz',
     sel: true,
     img1: new URL('../assets/img/sys_5.png', import.meta.url),
     img2: new URL('../assets/img/sys_5.png', import.meta.url),
 }, {
     id: 6,
-    name: 'WLAN',
+    name: 'setting.wlan',
     sel: false,
     img1: new URL('../assets/img/sys_6.png', import.meta.url),
     img2: new URL('../assets/img/sys_6.png', import.meta.url),
@@ -114,7 +135,9 @@ const ModelClick = (e: number) => {
         OpenSetting()
     }
 }
-
+const hiddenPass = () => {
+    PasswordControl.value = false
+}
 onMounted(() => {
     let obj: any = localStorage.getItem("hiddenSettings")
     if (obj) {
@@ -173,9 +196,12 @@ function hiddenSettingConfim() {
 
 }
 
+defineExpose({ useStore, PasswordControl });
+
 </script>
 
 <template>
+    <SettingPassVue :PasswordControl="PasswordControl" :defautType="1" @ficback="exitSetting" @passin="hiddenPass" />
     <div class="all">
         <div class="tip">
             <!-- <navbarVue :heights="'84'" /> -->
@@ -183,7 +209,7 @@ function hiddenSettingConfim() {
         <div class="set_content">
             <div class="set_left">
                 <div class="set_font1">
-                    设置管理
+                    {{$t('setting.szgl')}}
                 </div>
 
                 <div class="set_list">
@@ -191,24 +217,24 @@ function hiddenSettingConfim() {
                         <div class="gip" v-if="current_Set==index"></div>
                         <div :class="current_Set==index?'control_box':'control_box2'">
                             <img :src="current_Set==index?item.img:item.img2">
-                            <div>{{item.name}}</div>
+                            <div>{{$t(item.name)}}</div>
                         </div>
                     </div>
                 </div>
-                <div class="exit_set" @click="exitSetting">退出设置</div>
+                <div class="exit_set" @click="exitSetting">{{$t('setting.tcsz')}}</div>
             </div>
 
             <div class="set_right">
                 <div>
                     <div>
                         <div class="sys_top">
-                            <div class="sys_bj font4">便捷功能</div>
+                            <div class="sys_bj font4">{{$t('setting.bjgn')}}</div>
                             <div class="sys_modetype">
                                 <!-- :class="item.sel?'sys_mode_one2':'sys_mode_one'"  -->
                                 <div v-for="(item,index) in modetype" :key="index"
                                     :class="item.sel?'sys_mode_one2':'sys_mode_one'" @click="ModelClick(item.id)">
                                     <img :src="item.img1" style="width:38px;height: 38px;margin-bottom: 13px;">
-                                    <div :class="item.sel?'f1':'f2'">{{item.name}}</div>
+                                    <div :class="item.sel?'f1':'f2'">{{$t(item.name)}}</div>
                                 </div>
                             </div>
                         </div>
@@ -216,17 +242,17 @@ function hiddenSettingConfim() {
                     <div class="sys_setting">
                         <div>
                             <div>
-                                <span class="sys_span1 font4">多语言设置</span>
+                                <span class="sys_span1 font4">{{$t('setting.dyysz')}}</span>
                             </div>
-                            <div>切换语言</div>
+                            <div>{{$t('setting.qhyy')}}</div>
                         </div>
                     </div>
                     <div class="sys_setting">
                         <div>
                             <div>
-                                <span class="sys_span1 font4">管理员密码</span>
+                                <span class="sys_span1 font4">{{$t('setting.glymm')}}</span>
                             </div>
-                            <div>修改密码</div>
+                            <div>{{$t('setting.xgmm')}}</div>
                         </div>
                     </div>
                     <div v-if="hiddenSettings.visible" class="sys_user_setting" style="border-radius: 13px 13px 0 0;">
@@ -256,39 +282,39 @@ function hiddenSettingConfim() {
                         </div>
                     </div> -->
                     <div class="sys_message">
-                        <div @click="hiddenSetting()" class="sys_message_top font4">系统信息</div>
+                        <div @click="hiddenSetting()" class="sys_message_top font4">{{$t('setting.xtxx')}}</div>
                         <div class="sys_onemessage">
-                            <div>机器人类型</div>
-                            <div>暂无信息</div>
+                            <div>{{$t('setting.jqrlx')}}</div>
+                            <div>{{$t('setting.zwsj')}}</div>
                         </div>
 
                         <div class="sys_onemessage">
-                            <div>机器人SN</div>
-                            <div>暂无信息</div>
+                            <div>{{$t('setting.jqrsn')}}</div>
+                            <div>{{$t('setting.zwsj')}}</div>
                         </div>
 
                         <div class="sys_onemessage">
-                            <div>机器人版本</div>
-                            <div>暂无信息</div>
+                            <div>{{$t('setting.jqrbb')}}</div>
+                            <div>{{$t('setting.zwsj')}}</div>
                         </div>
                         <div class="sys_onemessage">
-                            <div>机器人底盘版本</div>
-                            <div>暂无信息</div>
+                            <div>{{$t('setting.jqrdpbb')}}</div>
+                            <div>{{$t('setting.zwsj')}}</div>
                         </div>
                         <div class="sys_onemessage noborder">
-                            <div>机器人部署时间</div>
-                            <div>暂无信息</div>
+                            <div>{{$t('setting.jqrbssj')}}</div>
+                            <div>{{$t('setting.zwsj')}}</div>
                         </div>
                     </div>
                     <div class="emptyline"></div>
                     <div class="mask_tapapk" v-if="showTapApk">
                         <div class="_makcontent">
                             <div class="tip_apk">
-                                是否跳转至车机建图app
+                                {{$t('setting.sftz')}}
                             </div>
                             <div class="tip_meth">
-                                <div @click="TapApkControl">否</div>
-                                <div @click="TapAPK">是</div>
+                                <div @click="TapApkControl">{{$t('setting.fou')}}</div>
+                                <div @click="TapAPK">{{$t('setting.shi')}}</div>
                             </div>
                         </div>
                     </div>

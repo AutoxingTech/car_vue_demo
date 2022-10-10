@@ -5,8 +5,6 @@ import { CrashStatus } from '../js/globalData'
 import { onMounted, reactive, ref, watch } from 'vue';
 import store from '../store';
 import { onBeforeRouteLeave } from 'vue-router';
-import path from 'path';
-import { downloadStatus, compress, installApk } from '../js/android';
 const userStore: any = store()
 const task = taskInfo
 const takeMeal = ref(false)
@@ -18,9 +16,11 @@ let countdownTimeout: any = ''  //倒计时
 let pauseshowtime = ref(0)
 let getearly_pausetime = ref(0)
 let curise_pausetime = ref(0)
+let curiseCur = ref()
+let getmeal_pausetime = ref(0) //取餐等待时长
 //14出发 16到达 到达状态巡游不需要暂停，临时解决 
 //sdk暂停状态 暂停无效也怕时间差寸交互不及时
-let cruisePauseAble = 0
+const cruisePauseAble = ref(0)
 
 function setCurrentTask(t: any) {
     task.currentTask = t
@@ -30,19 +30,33 @@ function UICallBack(tag: number) {
     console.log("==============UICallBack==========", tag)
     switch (tag) {
         case 14: {//前往
-            cruisePauseAble = 14
+            cruisePauseAble.value = 14
             updateCurrentTaskIndex()
         }
             break;
         case 16: {//到达
-            cruisePauseAble = 16
+            console.log("到达16")
+            cruisePauseAble.value = 16
+            if (taskInfo.runType == 23) {
+                curiseCur.value = taskInfo.currentTask.name
+                console.log(curiseCur.value, "value")
+            }
+
         }
             break;
         case 40: {//到达
+            console.log("到达40")
             takeMeal.value = true
+            if (taskInfo.runType == 20 || taskInfo.runType == 21 || taskInfo.runType == 22) {
+                //到达之前点击了提前取
+                getcurrentearly.value = false
+                clearTimeout(countdownTimeout)
+                TimeoutSet_getmeal(0)
+            }
         }
             break;
         case 1001: {//结束
+            task.currentTask.name = ""
             navIndex()
         }
             break;
@@ -90,7 +104,7 @@ function updateCurrentTaskIndex() {
         setCurrentTask(t)
     }
     if (hastask == false) {
-        if (taskInfo.runType == 20 || taskInfo.runType == 21 || taskInfo.runType == 23) {
+        if (taskInfo.runType == 20 || taskInfo.runType == 21 || taskInfo.runType == 22 || taskInfo.runType == 23) {
             console.log("该去待命点了")
             let t = taskInfo.backPt;
             taskInfo.runType = 24
@@ -103,14 +117,34 @@ function updateCurrentTaskIndex() {
 
 //暂停/继续
 function pause() {
-    console.log(taskInfo.runType, cruisePauseAble)
+    console.log(taskInfo.runType, cruisePauseAble.value)
     clearTimeout(countdownTimeout)
     if (taskInfo.runType == 20 || taskInfo.runType == 21) {
         if (isPause.value) {
-            robotUtil.resumeMotion().then(() => {
-                updateCurrentTaskIndex()
-                isPause.value = !isPause.value
-            })
+            let arr = []
+            for (let i = 0; i < task.list.length; i++) {
+                if (task.list[i].preGet == true) { //todo 需要改id
+                    arr.push({ index: i, isPass: true })
+                }
+            }
+            if (arr.length > 0) {
+                robotUtil.updateTask(arr).then((res: any) => {
+                    return robotUtil.executeTask()
+                }).then(() => {
+                    for (let i = 0; i < task.list.length; i++) {
+                        if (task.list[i].preGet == true) { //todo 需要改id
+                            task.list[i].preGet = false
+                        }
+                    }
+                    updateCurrentTaskIndex()
+                    isPause.value = !isPause.value
+                })
+            } else {
+                robotUtil.resumeMotion().then(() => {
+                    updateCurrentTaskIndex()
+                    isPause.value = !isPause.value
+                })
+            }
         } else {
             robotUtil.pauseTask().then(() => {
                 isPause.value = !isPause.value
@@ -119,7 +153,7 @@ function pause() {
         }
     } else if (taskInfo.runType == 23) {
         //巡游暂停
-        if (cruisePauseAble == 16) {
+        if (cruisePauseAble.value == 16) {
             return
         } else {
             if (cruiseStop.value) {
@@ -144,25 +178,38 @@ function cancelTask() {
 
 //取餐
 function takeAway(item: any) {
+    clearTimeout(countdownTimeout)
     item.status = 3
-    robotUtil.continueTask().then(() => {
-        updateCurrentTaskIndex()
-        takeMeal.value = false
-    })
+    let arr = []
+    for (let i = 0; i < task.list.length; i++) {
+        if (task.list[i].preGet == true) { //todo 需要改id
+            arr.push({ index: i, isPass: true })
+        }
+    }
+    if (arr.length > 0) {
+        robotUtil.updateTask(arr).then((res: any) => {
+            return robotUtil.executeTask()
+        }).then(() => {
+            for (let i = 0; i < task.list.length; i++) {
+                if (task.list[i].preGet == true) { //todo 需要改id
+                    task.list[i].preGet = false
+                }
+            }
+            updateCurrentTaskIndex()
+            takeMeal.value = false
+        })
+    } else {
+        robotUtil.continueTask().then(() => {
+            updateCurrentTaskIndex()
+            takeMeal.value = false
+        })
+    }
 }
 
 //提前取
 function preGet(item: any) {
-    let idx = -1
-    for (let i = 0; i < task.list.length; i++) {
-        if (item.name == task.list[i].name) { //todo 需要改id
-            idx = i
-            break;
-        }
-    }
-    robotUtil.updateTask([{ index: idx, isPass: true }]).then((res: any) => {
-        item.status = 3
-    })
+    item.status = 3
+    item.preGet = true
 }
 
 //点击当前提前取
@@ -192,18 +239,16 @@ function getEarly() {
         let item = task.list[i]
         if (item.status == 1) { //todo 需要改id
             robotUtil.updateTask([{ index: i, isPass: true }]).then(() => {
+                return robotUtil.executeTask()
+            }).then(() => {
                 item.status = 3
-                robotUtil.resumeMotion().then(() => {
-                    updateCurrentTaskIndex()
-                    getcurrentearly.value = false
-                })
+                updateCurrentTaskIndex()
+                getcurrentearly.value = false
             })
             break;
         }
     }
 }
-
-
 
 
 function navCrashstop() {
@@ -260,7 +305,7 @@ function TimeoutSet_getEary(e: number) {
     countdownTimeout = setTimeout(() => {
         i += 1
         if (i == pauseTime) {
-            pause()
+            getEarly()
         } else {
             TimeoutSet_getEary(i)
         }
@@ -282,6 +327,27 @@ function TimeoutSet_Curise(e: number) {
         }
     }, 1000)
     curise_pausetime.value = pauseTime - i
+}
+
+//到达点位开始倒计时
+function TimeoutSet_getmeal(e: number) {
+    let pauseTime = userStore.customSetting.delivery.stopDuration
+    // console.log(pauseTime, "time")
+    let i = e
+    countdownTimeout = setTimeout(() => {
+        i += 1
+        if (i == pauseTime) {
+            for (let item of task.list) {
+                if (item.status == 2) {
+                    takeAway(item)
+                    break
+                }
+            }
+        } else {
+            TimeoutSet_getmeal(i)
+        }
+    }, 1000)
+    getmeal_pausetime.value = pauseTime - i
 }
 
 
@@ -328,19 +394,28 @@ onBeforeRouteLeave(() => {
     <!-- 任务中画面 -->
     <div class="task_content" @click="pause" v-if="!isPause">
         <div class="center_table" v-if="task.runType!==23">{{task.currentTask.name}}</div>
-        <div class="center_table" v-if="task.runType==23&&cruiseStop==false">巡游中</div>
-        <div class="center_table" v-if="task.runType==23&&cruiseStop==true">巡游已暂停</div>
+        <div class="center_table" v-if="task.runType==23&&cruiseStop==false&&cruisePauseAble!=16">{{$t('task.xyz')}}
+        </div>
 
-        <div v-if="task.runType==20||task.runType==21" class="center_give">送餐中</div>
+        <div class="center_table" v-if="task.runType==23&&cruiseStop==false&&cruisePauseAble==16">
+            {{task.currentTask.name}}
+        </div>
+        <!-- 巡游已暂停 -->
+        <div class="center_table" v-if="task.runType==23&&cruiseStop==true">{{$t('task.xyyzt')}}</div>
+
+        <div v-if="task.runType==20||task.runType==21" class="center_give">{{$t('task.scz')}}</div>
+        <div v-if="task.runType==23&&cruiseStop==false&&cruisePauseAble==16" class="center_give">{{$t('task.xyydd')}}
+        </div>
 
         <div v-if="task.runType==23&&cruiseStop==true" class="center_give" style="bottom:140px">
-            <div>暂停巡游任务中</div>
-            <div>点击屏幕继续巡游</div>
-            <div style="color: #ED8037;">倒数计时中({{curise_pausetime}}s)</div>
+            <div>{{$t('task.ztxyrwz')}}</div>
+            <div>{{$t('task.djpmjxxy')}}</div>
+            <div style="color: #ED8037;">{{$t('task.dsjsz')}} ({{curise_pausetime}}s)</div>
         </div>
 
         <img src="../assets/img/taskcircle.png" style="height: 100%;width: 100%;position: absolute;">
-        <img src="../assets/img/taskcircle2.png" style="height: 100%;width: 100%;z-index: 1;position: absolute;">
+        <img src="../assets/img/taskcircle2.png"
+            style="height: 550px;width: 564.48px;z-index: 1;position: absolute;top: 5.76px;left: 5.76px;">
         <img src="../assets/img/taskcircle3.png" class="centercircle">
     </div>
     <div class="stop_now" @click="navCrashstop" v-if="!isPause">
@@ -358,7 +433,7 @@ onBeforeRouteLeave(() => {
             <div>
                 <img src="../assets/img/taskr2.png" style="width:100%;height: 100%;">
             </div>
-            <div class="font8">结束任务</div>
+            <div class="font8">{{$t('task.jsrw')}}</div>
         </div>
     </div>
 
@@ -369,12 +444,12 @@ onBeforeRouteLeave(() => {
                 <img src="../assets/img/eary_getmeal.png" style="width:100%;height: 100%;">
             </div>
             <div class="overtime">
-                是否完成操作
+                {{$t('task.sfwccz')}}
             </div>
 
             <div class="bot-button">
-                <div @click="Cancle_getEarly">取消</div>
-                <div @click="getEarly">完成（{{getearly_pausetime}}s）</div>
+                <div @click="Cancle_getEarly">{{$t('index.qx')}}</div>
+                <div @click="getEarly">{{$t('task.wc')}} （{{getearly_pausetime}}s）</div>
             </div>
         </div>
     </div>
@@ -388,18 +463,18 @@ onBeforeRouteLeave(() => {
                 <div class="annicont">
                     <div class="ondeliveryable">{{task.currentTask.name}}</div>
                     <div v-if="task.runType==20||task.runType==21" class="deliverytip font9">
-                        <div>暂停任务中</div>
-                        <div>点击屏幕继续配送</div>
-                        <div>倒数计时中({{pauseshowtime}}s)</div>
+                        <div>{{$t('task.ztrwz')}}</div>
+                        <div>{{$t('task.djpmjxps')}}</div>
+                        <div>{{$t('task.dsjsz')}} ({{pauseshowtime}}s)</div>
                     </div>
                     <img src="../assets/img/taskcircle.png" style="height: 100%;width: 100%;position: absolute;">
                     <img src="../assets/img/taskcircle2.png"
-                        style="height: 100%;width: 100%;z-index: 1;position: absolute;">
+                        style="height: 550px;width: 564.48px;z-index: 1;position: absolute;top: 5.76px;left: 5.76px;">
                 </div>
             </div>
             <div class="rightdevery">
                 <div class="delivery_list">
-                    <div class="topmess">任务列表 <div class="emptyline"></div>
+                    <div class="topmess">{{$t('task.rwlb')}} <div class="emptyline"></div>
                         <div class="list_scroll">
                             <div class="one_li" v-for="(item,index) in task.pallet">
                                 <div class="lineem" v-if="index!=task.pallet.length-1">
@@ -415,7 +490,7 @@ onBeforeRouteLeave(() => {
                                     </div>
                                 </div>
                                 <div @click="preGet(item)" class="bottom_Co font8"
-                                    v-if="item.status==0||item.status==1">提前取
+                                    v-if="item.status==0||item.status==1">{{$t('task.tqq')}}
                                 </div>
                             </div>
                         </div>
@@ -425,11 +500,11 @@ onBeforeRouteLeave(() => {
                 <div class="delivery_bottom">
                     <div class="bottom1 font8" @click="ModifyTask">
                         <img src="../assets/img/taskr1.png" alt="">
-                        修改任务
+                        {{$t('index.xgrw')}}
                     </div>
                     <div class="bottom2 font8" @click="cancelTask">
                         <img src="../assets/img/taskr2.png" alt="">
-                        结束任务
+                        {{$t('task.jsrw')}}
                     </div>
                 </div>
             </div>
@@ -447,23 +522,26 @@ onBeforeRouteLeave(() => {
                 <div>
                     {{item.name}}
                 </div>
-                <div>
+                <div v-if="task.runType==20">
                     <span v-for="(item2,index2) in item.idx" :key="index2">
-                        {{item2+1}}层<span v-if="index2!=item.idx.length - 1">、</span>
-                    </span>托盘
+                        {{item2+1}}{{$t('task.ceng')}}<span v-if="index2!=item.idx.length - 1">、</span>
+                    </span>{{$t('task.tuopan')}}
                 </div>
                 <div class="taketype" @click="takeAway(item)" v-if="item.status==2">
-                    <div>立即</div>
-                    <div>取出</div>
+                    <div>{{$t('task.liji')}}</div>
+                    <div>{{$t('task.quchu')}}</div>
                 </div>
 
                 <div class="taketype2" v-if="item.status==3">
-                    <div>已取出</div>
+                    <div>{{$t('task.yqc')}}</div>
                 </div>
                 <div class="taketype3" @click="preGet(item)" v-if="item.status==1||item.status==0">
-                    <div>提前</div>
-                    <div>取出</div>
+                    <div>{{$t('task.tiqian')}}</div>
+                    <div>{{$t('task.quchu')}}</div>
                 </div>
+            </div>
+            <div class="interview">
+                {{$t('task.lkjsz')}}({{getmeal_pausetime}}s)
             </div>
         </div>
 
@@ -471,10 +549,16 @@ onBeforeRouteLeave(() => {
         <div v-if="task.list.length==1" class="take_cont2">
             <div class="onetasktake">
                 <div>{{task.currentTask.name}}</div>
-                <div>请取餐</div>
+                <div>{{$t('task.qqc')}}</div>
             </div>
-            <div @click="takeAway(task.currentTask)" class="onepallent_take">立即取餐</div>
+            <div @click="takeAway(task.currentTask)" class="onepallent_take">{{$t('task.ljqc')}}</div>
+
+            <div class="interview">
+                {{$t('task.lkjsz')}}({{getmeal_pausetime}}s)
+            </div>
         </div>
+
+
     </div>
     <!-- 取餐画面 -->
 </template>
@@ -501,8 +585,8 @@ onBeforeRouteLeave(() => {
 }
 
 .task_content {
-    height: 574px;
-    width: 574px;
+    height: 573.12px;
+    width: 573.12px;
     margin: 0 auto;
     position: relative;
 
@@ -537,16 +621,21 @@ onBeforeRouteLeave(() => {
 }
 
 .center_table {
+    width: 435px;
     font-size: 75px;
     font-weight: bold;
     color: #000000;
     line-height: 574px;
     text-align: center;
     position: absolute;
-    left: 0;
+    left: 50%;
+    margin-left: -217.5px;
     top: 0;
     right: 0;
     bottom: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 
 }
 
@@ -594,15 +683,17 @@ onBeforeRouteLeave(() => {
 }
 
 .annicont {
-    width: 579px;
-    height: 579px;
+    width: 573.12px;
+    height: 573.12px;
     border-radius: 50%;
     position: relative;
 }
 
 .ondeliveryable {
+    width: 435px;
     position: absolute;
-    left: 0;
+    left: 50%;
+    margin-left: -217.5px;
     right: 0;
     top: 0;
     bottom: 0;
@@ -612,7 +703,9 @@ onBeforeRouteLeave(() => {
     color: #000000;
     text-align: center;
     line-height: 579px;
-
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .deliverytip {
@@ -846,7 +939,7 @@ onBeforeRouteLeave(() => {
     display: flex;
     flex-wrap: wrap;
     align-content: baseline;
-
+    position: relative;
 }
 
 .take_cont2 {
@@ -861,6 +954,7 @@ onBeforeRouteLeave(() => {
     display: flex;
     flex-direction: column;
     align-items: center;
+    position: relative;
 
 }
 
@@ -1148,5 +1242,18 @@ onBeforeRouteLeave(() => {
     color: #608FFA;
     margin-top: 10px;
 
+}
+
+.interview {
+    width: 200px;
+    position: absolute;
+    left: 50%;
+    margin-left: -100px;
+    bottom: 20px;
+    font-size: 20px;
+    font-family: Microsoft YaHei;
+    font-weight: bold;
+    color: #ED8037;
+    text-align: center;
 }
 </style>

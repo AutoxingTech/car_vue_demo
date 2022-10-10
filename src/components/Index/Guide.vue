@@ -11,6 +11,7 @@ export default defineComponent({
                     instance.Guidelist = ''
                 }
             }
+            instance.initscroll()
         })
     }
 });
@@ -19,15 +20,17 @@ export default defineComponent({
 
 
 <script setup lang="ts">
-import { onMounted, ref, reactive } from 'vue'
+import { ref, reactive } from 'vue'
 import 'swiper/css';
 import { Swiper, SwiperSlide } from 'swiper/vue';
 import { tables, poiMap } from '../../js/Datacollation';
-import { audioMode } from "../../js/globalConfig"
+import { audioMode,ActionType } from "../../js/globalConfig"
 import settingUtil from '../../js/settingUtil'
 import store from '../../store'
-import { robotUtil, taskInfo } from '../../js/robotUtil';
+import { robotUtil } from '../../js/robotUtil';
 import { toast } from '../Toast/Toast';
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 const userstore: any = store()
 const currentType = ref(1)
 const tabMessage: any = reactive(tables)[2] //引领数据   
@@ -74,11 +77,12 @@ function floorTap(item: any) {
 function computeFloor() {
     let ficlist = currentType.value == 1 ? floorlist1 : floorlist2
     let ficfloor = currentType.value == 1 ? tabMessage.boardlist[tabMessage.swipertab][0].floor : tabMessage.boardlist2[tabMessage.swipertab2][0].floor
-    for (let i of ficlist) {
-        if (i.name == ficfloor) {
-            i.sel = true
+    for (let i in ficlist) {
+        if (ficlist[i].name == ficfloor) {
+            ficlist[i].sel = true
+            setcurrent(Number(i))
         } else {
-            i.sel = false
+            ficlist[i].sel = false
         }
     }
 }
@@ -130,21 +134,30 @@ function volumeculation(e: any) {
     if (broadcasts[e + ""] != undefined) {
         currentcast = broadcasts[e + ""]
     }
-    let Fobj: any = {
-        mode: audioMode,
-        audioId: "3111002",//您的餐到了
-        url: currentcast ? currentcast.fileUrl : null,
-        volume: userstore.customSetting.sound.switchon ? userstore.customSetting.sound.voiceVolume : 0,
-        interval: currentcast ? currentcast.ruleInterval : -1,
-        duration: currentcast ? currentcast.ruleDuration : -1,
+    if (currentcast) {
+        let Fobj: any = {
+            mode: audioMode,
+            url: currentcast.fileUrl,
+            volume: userstore.customSetting.sound.switchon ? userstore.customSetting.sound.voiceVolume : 0,
+            interval: currentcast.ruleInterval,
+            duration: -1,
+        }
+        // 1 按播报次数  2按照播报时间
+        if (currentcast.ruleType == 1) {
+            Fobj.num = currentcast.ruleCount
+        } else if (currentcast.runType == 2) {
+            Fobj.duration = currentcast.ruleDuration
+        }
+        return Fobj
+    } else {
+        return {}
     }
-    return Fobj
 }
 //开始引领
 const goTask = () => {
     let Guide_site = Guidelist.value
     if (!Guide_site) {
-        toast.show('未选择站点')
+        toast.show(t('index.wxzzd'))
         return
     }
     let pts = [];
@@ -153,29 +166,26 @@ const goTask = () => {
             x: Guide_site.coordinate[0],
             y: Guide_site.coordinate[1],
             yaw: Guide_site.yaw,
+            areaId: Guide_site.areaId,
             ext: {
                 name: Guide_site.name,
-                id: Guide_site.id,
-                areaId:Guide_site.areaId
+                id: Guide_site.id
             },
             stepActs: [
                 {
-                    type: 5,//本地音频
+                    type: ActionType.PlayAudio,//本地音频 //todo 没有引领音乐最好不传
                     data: volumeculation(Guide_site.id)
                 },
-                //等待交互
-                {
-                    type: 40
-                }
             ],
         });
 
     let standby = settingUtil.getStandbyStation()
     let backPt = {
+        type:standby.type,
         x: standby.coordinate[0],
         y: standby.coordinate[1],
         yaw: standby.yaw,
-        areaId:standby.areaId,
+        areaId: standby.areaId,
         ext: {
             name: "返航中",//standby.name,
             id: standby.id,
@@ -190,19 +200,7 @@ const goTask = () => {
         },
         stepActs: [
             {
-                type: 5,//本地音频
-                data: {
-                    mode: audioMode,
-                    audioId: "3111012",//"小舟要出发送餐了，请让一让"
-                    num: 1,
-                    volume: userstore.customSetting.sound.voiceVolume,
-                    interval: -1,
-                    duration: -1,
-                    channel: 1
-                },
-            },
-            {
-                type: 5,//背景音乐
+                type: ActionType.PlayAudio,//背景音乐
                 data: {
                     mode: audioMode,
                     audioId: settingUtil.getbackgroundSong(),
@@ -214,7 +212,7 @@ const goTask = () => {
                 },
             },
             {
-                type: 41,  //速度设置
+                type: ActionType.SetSpeed,  //速度设置
                 data: {
                     speed: userstore.customSetting.delivery.runSpeed / 100
                 }
@@ -235,7 +233,24 @@ const goTask = () => {
 
 }
 
-defineExpose({ Guidelist, userstore });
+//滚动到当前位置
+function setcurrent(i: number) {
+    var element1 = document.getElementById("id" + (Number(i)))
+    if (element1) {
+        element1.scrollIntoView({ block: 'center', inline: 'center', behavior: 'auto' })
+    }
+}
+//初始化滚动条
+function initscroll() {
+    let ficlist = currentType.value == 1 ? floorlist1 : floorlist2
+    for (let i in ficlist) {
+        if (ficlist[i].sel) {
+            setcurrent(Number(i))
+        }
+    }
+}
+
+defineExpose({ Guidelist, userstore, initscroll });
 </script>
     
 <template>
@@ -243,51 +258,57 @@ defineExpose({ Guidelist, userstore });
         <div class="multitop">
 
             <!-- 餐厅的楼层循环选择 begin-->
-            <div class="floor_content" v-if="currentType == 1">
-                <div class="floor_list"
+            <div :class="floorlist1.length>0?'floor_content':'floor_content2'" v-if="currentType == 1">
+                <!-- <div class="floor_list"
                     v-if="floorlist1.length <= 4 || (floorlist1.length > 4 && !tabMessage.floorlist1scroll)">
                     <div :class="item.sel ? 'one_floor' : 'nosel_floor'" @click="floorTap(item)"
                         v-for="(item, index) in floorlist1.slice(0, 4)" :key="index">{{ item.name }}</div>
+                </div> -->
+                <div class="floor_list2">
+                    <div :id="'id'+index" :class="item.sel ? 'one_floor' : 'nosel_floor'"
+                        v-for="(item, index) in floorlist1" @click="floorTap(item)" :key="index">{{ item.name }}</div>
                 </div>
-                <div class="floor_list2" v-if="floorlist1.length > 4 && tabMessage.floorlist1scroll">
-                    <div :class="item.sel ? 'one_floor' : 'nosel_floor'" v-for="(item, index) in floorlist1"
-                        @click="floorTap(item)" :key="index">{{ item.name }}</div>
-                </div>
-                <div class="more" v-if="floorlist1.length > 4 && !tabMessage.floorlist1scroll" @click="showMorefloor()">
-                    更多</div>
+                <!-- <div class="more" v-if="floorlist1.length > 4 && !tabMessage.floorlist1scroll" @click="showMorefloor()">
+                    更多</div> -->
             </div>
             <!-- 餐厅的楼层循环选择 end-->
 
             <!-- 包间的楼层循环选择 begin-->
-            <div class="floor_content" v-if="currentType == 2">
-                <div class="floor_list"
+            <div :class="floorlist2.length>0?'floor_content':'floor_content2'" v-if="currentType == 2">
+                <!-- <div class="floor_list"
                     v-if="floorlist2.length <= 4 || (floorlist2.length > 4 && !tabMessage.floorlist2scroll)">
                     <div :class="item.sel ? 'one_floor' : 'nosel_floor'" @click="floorTap(item)"
                         v-for="(item, index) in floorlist2.slice(0, 4)" :key="index">{{ item.name }}</div>
+                </div> -->
+                <div class="floor_list2">
+                    <div :id="'id'+index" :class="item.sel ? 'one_floor' : 'nosel_floor'"
+                        v-for="(item, index) in floorlist2" @click="floorTap(item)" :key="index">{{ item.name }}</div>
                 </div>
-                <div class="floor_list2" v-if="floorlist2.length > 4 && tabMessage.floorlist2scroll">
-                    <div :class="item.sel ? 'one_floor' : 'nosel_floor'" v-for="(item, index) in floorlist2"
-                        @click="floorTap(item)" :key="index">{{ item.name }}</div>
-                </div>
-                <div class="more" v-if="floorlist2.length > 4 && !tabMessage.floorlist2scroll" @click="showMorefloor()">
-                    更多</div>
+                <!-- <div class="more" v-if="floorlist2.length > 4 && !tabMessage.floorlist2scroll" @click="showMorefloor()">
+                    更多</div> -->
             </div>
             <!-- 包间的楼层循环选择 end-->
 
 
             <div class="sel_type">
                 <div @click="currentType = 1" :class="currentType == 1 ? 'left_content_in' : 'left_content_out'">
-                    选餐桌
+                    {{$t("index.xcz")}}
                 </div>
                 <div @click="currentType = 2" :class="currentType == 2 ? 'right_content_in' : 'right_content_out'">
-                    选包间
+                    {{$t("index.xbj")}}
                 </div>
             </div>
         </div>
         <!--列表 -->
         <div class="mu_point_list">
-            <div class="left_pre">
-                <span @click="swiperPrev" style="margin-top: -12px;"></span>
+            <div class="left_pre" style="margin-top: -12px;">
+                <span @click="swiperPrev" v-if="currentType==1&&floorlist1.length>0"
+                    :style="tabMessage.swipertab==0?'border-right-color: #C6C6C6 !important;':'border-right-color: #83A9FF !important;'"
+                    class="swiper-button-prev"></span>
+
+                <span @click="swiperPrev" v-if="currentType==2&&floorlist2.length>0"
+                    :style="tabMessage.swipertab2==0?'border-right-color: #C6C6C6 !important;':'border-right-color: #83A9FF !important;'"
+                    class="swiper-button-prev"></span>
             </div>
             <!-- 餐桌点位选择 start-->
             <div class="left_center" v-if="currentType == 1">
@@ -321,8 +342,14 @@ defineExpose({ Guidelist, userstore });
                 </swiper>
             </div>
             <!-- 包间点位选择 end-->
-            <div class="right_pre">
-                <span @click="swiperNext" style="margin-top: -12px;"></span>
+            <div class="right_pre" style="margin-top: -12px;">
+                <span @click="swiperNext" v-if="currentType==1&&floorlist1.length>0"
+                    :style="tabMessage.swipertab==tabMessage.boardlist.length-1?'border-left-color: #C6C6C6 !important;':'border-left-color: #83A9FF !important;'"
+                    class="swiper-button-next"></span>
+
+                <span @click="swiperNext" v-if="currentType==2&&floorlist2.length>0"
+                    :style="tabMessage.swipertab2==tabMessage.boardlist2.length-1?'border-left-color: #C6C6C6 !important;':'border-left-color: #83A9FF !important;'"
+                    class="swiper-button-next"></span>
             </div>
         </div>
         <div class="mu_dot">
@@ -340,8 +367,8 @@ defineExpose({ Guidelist, userstore });
         </div>
         <div class="mu_sel_point">
             <div class="guide_task font1" @click="goTask">
-                <span v-if="userstore.isModify">修改任务</span>
-                <span v-else>立即出发</span>
+                <span v-if="userstore.isModify"> {{$t("index.xgrw")}}</span>
+                <span v-else> {{$t("index.ljcf")}}</span>
             </div>
         </div>
 
@@ -507,7 +534,7 @@ defineExpose({ Guidelist, userstore });
 }
 
 .floor_list {
-    /* width: 278px; */
+    max-width: 278px;
     height: 36px;
     display: flex;
 
@@ -518,7 +545,7 @@ defineExpose({ Guidelist, userstore });
 }
 
 .floor_list2 {
-    max-width: 332px;
+    max-width: 278px;
     height: 36px;
     overflow-x: scroll;
     display: -webkit-box;
@@ -567,7 +594,7 @@ defineExpose({ Guidelist, userstore });
     width: 220px;
     height: 75px;
     font-size: 23px;
-    line-height: 75px;
+    line-height: 68px;
     background-color: #83A9FF;
     color: #FFFFFF;
     border-radius: 17px;
@@ -586,7 +613,7 @@ defineExpose({ Guidelist, userstore });
     width: 220px;
     height: 75px;
     font-size: 23px;
-    line-height: 75px;
+    line-height: 68px;
     border: 3px solid #83A9FF;
     border-radius: 17px;
     transform: perspective(45px)scale(1.0, 1.0) rotateX(-4deg);
@@ -636,6 +663,9 @@ defineExpose({ Guidelist, userstore });
     box-sizing: border-box;
 }
 
+.floor_content2 {
+    background-color: #F1F2F6;
+}
 
 .more {
     width: 70px;

@@ -32,21 +32,24 @@ const LastChange_stand = () => {
     <div class="base_mask">
         <!-- 音乐选择 -->
         <div class="guide_contnet">
-            <div class="guide_tip_top font6">背景音乐选择</div>
-            <div :class="songlist.length>4?'scrolstyl':'normalstyl'">
-                <div class="guide_tipone" v-for="(item,index) in songlist" :key="index" @click="Changesong(item,index)">
-                    <div class="font6">
-                        {{item.name}}
-                    </div>
-                    <div class="">
-                        <img v-if="item.id==Defaultsong" src="../../../assets/img/language1.png" alt="">
-                        <img v-else src="../../../assets/img/selout.png" alt="">
+            <div class="guide_tip_top font6">{{$t('setting.bjyyxz')}}</div>
+            <div class="oneall">
+                <div :class="songlist.length>4?'scrolstyl':''">
+                    <div class="guide_tipone" v-for="(item,index) in songlist" :key="index"
+                        @click="Changesong(item,index)">
+                        <div class="font6">
+                            {{item.name}}
+                        </div>
+                        <div class="">
+                            <img v-if="item.id==Defaultsong" src="../../../assets/img/language1.png" alt="">
+                            <img v-else src="../../../assets/img/selout.png" alt="">
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="base_tip_meth font7">
-                <div @click="LastCancle_stand">取消</div>
-                <div @click="LastChange_stand()">确定</div>
+                <div @click="LastCancle_stand">{{$t('index.qx')}}</div>
+                <div @click="LastChange_stand()">{{$t('index.qd')}}</div>
             </div>
         </div>
 
@@ -89,7 +92,7 @@ const LastChange_stand = () => {
 }
 
 .guide_tipone {
-    height: 57px;
+    height: 61px;
     display: flex;
     justify-content: center;
     width: 444px;
@@ -148,7 +151,7 @@ const LastChange_stand = () => {
 }
 
 .scrolstyl {
-    max-height: 230px;
+    max-height: 245px;
     overflow-y: scroll;
 }
 
@@ -156,5 +159,17 @@ const LastChange_stand = () => {
     border-bottom: none;
 }
 
-.normalsty {}
+
+.oneall {
+    width: 485px;
+    border-radius: 15px;
+    margin: 0 auto;
+    max-height: 245px;
+    overflow: hidden;
+    background-color: white;
+}
+
+.oneall>div:last-child {
+    border-bottom: none;
+}
 </style>

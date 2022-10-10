@@ -14,15 +14,21 @@ import { okRequest, setToken } from "../js/okRequest";
 import { initTable, setCurrentFloor } from '../js/Datacollation'
 import { globalData } from "../js/globalData";
 import { robotUtil, MinLocQuality } from "../js/robotUtil"
-import { H5Version } from "../js/globalConfig";
+import { H5Version, AppMode } from "../js/globalConfig";
 import store from "../store";
 import { onBeforeRouteLeave } from "vue-router";
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 let downWatch: Function, compressWatch: Function;
 const useStore = store()
 const CA = ref(1) //检查机器人状态 0无状态 1正在进行 2 完成
 const CB = ref(0)  //检查软件资源
 const CC = ref(0)  //设置站点信息
 const CD = ref(0)  //检查定位系统图
+
+let tap_num = 0 //点击次数
+let curTime: any = 0 //当前时间戳
+let lastTime: any = 0 //最后一次点击的时间戳
 
 const CurrentappVersion = ref(appVersion())
 const CurrentH5Version = ref(H5Version)  //H5version
@@ -43,7 +49,13 @@ function resetDate() {
     gosetting.value = false
     setposeTip.value = false
     timeoutgo = false
+}
 
+//清除十次点击数据
+function cleanData() {
+    tap_num = 0
+    curTime = 0
+    lastTime = 0
 }
 function initStart() {
     //初始化
@@ -52,7 +64,7 @@ function initStart() {
         return robotUtil.connectRobot()
     }).then((res: any) => {
         globalData.sn = res.robotId;
-        return robotUtil.getToken();
+        return robotUtil.getToken(AppMode.WAN_APP);
     }).then((res: any) => {
         setToken(res);
         return okRequest.robotInfo();
@@ -61,11 +73,21 @@ function initStart() {
         CB.value = 1
         useStore.$patch((state: any) => {
             state.customSetting = res.settings
+            if (!state.customSetting.basic.fontSize || (state.customSetting.basic.fontSize != 0 && state.customSetting.basic.fontSize != 1 && state.customSetting.basic.fontSize != 2)) {
+                state.customSetting.basic.fontSize = 0
+            }
+            localStorage.setItem('adminPass', state.customSetting.basic.adminPass)
+            const button = document.getElementById('app') as HTMLButtonElement;
+            button.setAttribute("class", 'theme_' + '' + state.customSetting.basic.fontSize + '');
         })
-        // return CheackAppVersion()  //检查app版本
+        return CheackAppVersion()  //检查app版本
     }).then(() => {
-        // return CheckH5Version()    //检查h5版本
+        return CheckH5Version()    //检查h5版本
     }).then(() => {
+        let version = robotUtil.getVersion_P()
+        useStore.$patch((state: any) => {
+            state.sdkVers = version
+        })
         CB.value = 2
         CC.value = 1
         return initTable()  //设置站点
@@ -75,8 +97,11 @@ function initStart() {
         return robotUtil.getState_P()
     }).then((res: any) => {
         CD.value = 2
-        console.log(res.areaId, "当前楼层的areaid")
         setCurrentFloor(res.areaId)
+        useStore.$patch((state: any) => {
+            state.robotstate.battery = res.battery
+            state.robotstate.isCharging = res.isCharging
+        })
         if (res.locQuality > MinLocQuality) {
             useStore.$patch((state: any) => {
                 state.nextpage = 1
@@ -172,7 +197,7 @@ function upgrade(url: String, path: String, name: String) {
                 }
             } else if (newvalue == -1) {
                 //下载失败
-                Abnormalcause.value = '文件下载失败'
+                Abnormalcause.value = t('starup.wjxzsb')
             }
         }
     );
@@ -187,7 +212,7 @@ function upgrade(url: String, path: String, name: String) {
                 //解压成功
             } else if (newvalue == -1) {
                 //解压失败
-                Abnormalcause.value = '文件解压失败'
+                Abnormalcause.value = t('starup.wjjysb')
             }
         }
     );
@@ -223,6 +248,32 @@ function navPage() {
         redirectPage('/setting')
     }, 1500);
 }
+
+//十击关闭弹框
+const startBluetooth = () => {
+    let time1: any = new Date()
+    tap_num++;
+    if (tap_num == 1) {
+        curTime = Math.round(time1);
+        lastTime = Math.round(time1);
+    } else if (tap_num == 10) {
+        if (curTime - lastTime < 3000) {
+            cleanData()
+            Abnormalcause.value = ''
+            return;
+        } else {
+            cleanData()
+            return;
+        }
+    } else {
+        lastTime = curTime;
+        curTime = Math.round(time1);
+        if (curTime - lastTime > 300) {
+            cleanData()
+        }
+    }
+
+}
 //如果点击设置
 onBeforeRouteLeave((to, from) => {
     if (to.fullPath == '/ficsetting') {
@@ -238,9 +289,16 @@ export default defineComponent({
         if (from.fullPath == "/ficsetting") {
             next((vm) => {
                 const instance: any = vm;
-                instance.gosetting = false
-                if (instance.useStore.nextpage != 0) {
-                    instance.navPage()
+                if (instance.useStore.reFresh) {
+                    instance.useStore.$patch((state: any) => {
+                        state.reFresh = false
+                        location.reload()
+                    })
+                } else {
+                    instance.gosetting = false
+                    if (instance.useStore.nextpage != 0) {
+                        instance.navPage()
+                    }
                 }
             });
         } else {
@@ -267,24 +325,21 @@ export default defineComponent({
                 <img src="../assets/img/checksuccess.png" />
             </div>
             <div>
-                设备检测成功
-                <!-- ,{{ downloadStatus.res }},{{ compressStatu }},{{
-                        downloadStatus.progress
-                        }} -->
+                {{$t('starup.sbjccg')}}
             </div>
         </div>
 
         <div class="box_header">
             <div>
                 <img src="../assets/img/starupico.png" />
-                <div>轻舟机器人</div>
+                <div>{{$t('starup.qzjqr')}}</div>
             </div>
-            <div>设备状态检测</div>
+            <div>{{$t('starup.sbztjc')}}</div>
         </div>
         <!-- 各状态检测信息 -->
         <!-- 1 -->
         <div class="one_box noborder">
-            <div>检查机器人状态</div>
+            <div>{{$t('starup.jcjqrzt')}}</div>
             <div>
                 <img v-if="CA==1" class="loadingico roate_loading" src="../assets/img/loading.png" />
                 <img v-if="CA==2" class="loadingico" src="../assets/img/loadingover.png" />
@@ -292,16 +347,16 @@ export default defineComponent({
         </div>
         <!-- 2 -->
         <div class="one_box">
-            <div>检查软件资源</div>
+            <div>{{$t('starup.jcrjzy')}}</div>
             <div>
-                <div class="lefttip" v-if="downloading">更新软件资源</div>
+                <div class="lefttip" v-if="downloading">{{$t('starup.gxrjzy')}}</div>
                 <img v-if="CB==1" class="loadingico roate_loading" src="../assets/img/loading.png" />
                 <img v-if="CB==2" class="loadingico" src="../assets/img/loadingover.png" />
             </div>
         </div>
         <!-- 3 -->
         <div class="one_box">
-            <div>设置站点信息</div>
+            <div>{{$t('starup.szzdxx')}}</div>
             <div>
                 <img v-if="CC==1" class="loadingico roate_loading" src="../assets/img/loading.png" />
                 <img v-if="CC==2" class="loadingico" src="../assets/img/loadingover.png" />
@@ -309,9 +364,9 @@ export default defineComponent({
         </div>
         <!-- 4 -->
         <div class="one_box">
-            <div>检查定位系统图</div>
+            <div>{{$t('starup.jcdwxtt')}}</div>
             <div>
-                <div class="lefttip" v-if="setposeTip">请去设置画面执行【充电桩复位】</div>
+                <div class="lefttip" v-if="setposeTip">{{$t('starup.qqszfw')}}</div>
                 <img v-if="CD==1" class="loadingico roate_loading" src="../assets/img/loading.png" />
                 <img v-if="CD==2" class="loadingico" src="../assets/img/loadingover.png" />
             </div>
@@ -320,20 +375,20 @@ export default defineComponent({
     </div>
     <div class="set_buttom ocenter" @click="navsetting">
         <img src="../assets/img/set.png" />
-        <div>系统设置</div>
+        <div>{{$t('starup.xtsz')}}</div>
     </div>
 
     <!-- 流程弹框 -->
     <div class="ocenter startank" v-if="Abnormalcause">
         <div class="portrait horizontal tankcontent">
-            <div>
-                异常
+            <div @click="startBluetooth">
+                {{$t('starup.yc')}}
             </div>
             <div>
                 {{Abnormalcause}}
             </div>
             <div @click="TryRefresh">
-                重试
+                {{$t('starup.cs')}}
             </div>
         </div>
     </div>

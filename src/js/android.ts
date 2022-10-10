@@ -123,7 +123,11 @@ export function webRefresh(url: String) {
   if (app) {
     app.actionFromJsWebRefresh(url)
   } else {
-    router.replace('/')
+    if (router.currentRoute.value.path == '/starup') {
+      location.reload()
+    } else {
+      router.replace('/')
+    }
   }
 }
 

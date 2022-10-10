@@ -112,39 +112,44 @@ const setSwiper = () => {
             for (let j in tables[i].boardlist2) {
                 if (tables[i].boardlist2[j][0].floor == currentfloor) {
                     tables[i].swipertab2 = Number(j)
+                    break
                 }
             }
             for (let j in tables[i].boardlist) {
                 if (tables[i].boardlist[j][0].floor == currentfloor) {
                     tables[i].swipertab = Number(j)
+                    break
                 }
             }
         }
     }
     let currentindex: any = 0
-    for (let p in EffectivFloor) {
-        if (EffectivFloor[p] == currentfloor) {
+    for (let p in tables[0].floorlist) {
+        if (tables[0].floorlist[p].name == currentfloor) {
             currentindex = p
         }
     }
+
     for (let i in tables) {
         if (Number(i) < 3) {
-            for (let item of tables[i].floorlist) {
-                item.sel = false
+            if (tables[i].floorlist && tables[i].floorlist.length > 0) {
+                for (let item of tables[i].floorlist) {
+                    item.sel = false
+                }
+                tables[i].floorlist[Number(currentindex)].sel = true
             }
-            for (let item of tables[i].floorlist2) {
-                item.sel = false
+            if (tables[i].floorlist2 && tables[i].floorlist2.length > 0) {
+                for (let item of tables[i].floorlist2) {
+                    item.sel = false
+                }
+                tables[i].floorlist2[Number(currentindex)].sel = true
             }
-            tables[i].floorlist[currentindex].sel = true
-            tables[i].floorlist2[currentindex].sel = true
         }
     }
 }
-
 const setmessage = (index: number, type: number, num: number, data: any) => {
-    type == 12 ? (tables[index].floorlist2 = getFloor()) : (tables[index].floorlist = getFloor())
+    type == 12 ? (tables[index].floorlist2 = getFloor(data)) : (tables[index].floorlist = getFloor(data))
     type == 12 ? (tables[index].boardlist2 = Arraysort(data, num)) : (tables[index].boardlist = Arraysort(data, num))
-    type == 12 ? (tables[index].swipertab2 = getSwiperindex(tables[index].boardlist2)) : (tables[index].swipertab = getSwiperindex(tables[index].boardlist))
 }
 const freshList = (e: any) => {
     if (e == null) {
@@ -152,31 +157,22 @@ const freshList = (e: any) => {
     }
     return JSON.parse(JSON.stringify(e))
 }
-//获取当前楼层对应的swiperindex
-const getSwiperindex = (list: any) => {
-    for (let i in list) {
-        if (list[i][0].floor == currentfloor) {
-            return Number(i)
-        }
-    }
-    return 0
-}
 //获取楼层
-const getFloor = () => {
+const getFloor = (e: any) => {
     let Flist = []
     let floorIndex = 0
-    for (let i of EffectivFloor) {
+    for (let i of e) {
         let has = false
         Flist.forEach((item) => {
-            if (item.name == i) {
+            if (item.name == i.floor) {
                 has = true
             }
             //等于currentfloor设置为高亮
-            if (i == currentfloor) {
+            if (i.floor == currentfloor) {
                 floorIndex = i
             }
         })
-        if (has == false) { Flist.push({ name: i, sel: false }) }
+        if (has == false) { Flist.push({ name: i.floor, sel: false }) }
         Flist[floorIndex].sel = true
     }
     return Flist
@@ -214,7 +210,7 @@ const Arraysort = (resData: any, num: number) => {
     for (let l in Data) {
         lastdata.push(...split_array(Data[l].dataInfo, num))
     }
-    let floorlist: any = getFloor()
+    let floorlist: any = getFloor(resData)
     //添加无站点的空swiper
     let newtable = []
     for (let k in floorlist) {
@@ -288,7 +284,7 @@ export const initTable = () => {
             let promiselist = []
             for (let i of [1, 2, 3, 4]) {    // "taskType": 1,       1=巡游;2=配送;3=引领;4=行为
                 promiselist.push(
-                    okRequest.broadcast_effect({ "businessId": globalData.businessId, "businessType": 1, "taskType": i, "robotId": globalData.sn }).then((res: any) => {
+                    okRequest.broadcast_effect({ "businessId": globalData.businessId, "businessType": 1, "taskType": i, "robotId": globalData.sn }, false).then((res: any) => {
                         poiMap[i + ""] = res.poiMap
                     })
                 )

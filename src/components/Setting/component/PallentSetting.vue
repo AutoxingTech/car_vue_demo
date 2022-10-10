@@ -1,17 +1,21 @@
 <script lang="ts" setup>
 import { reactive } from 'vue';
 import { toast } from '../../Toast/Toast';
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 const props = defineProps<{
     showPallent: boolean,
     pallet: any
 }>()
+const LightsLong = 76  //灯带总长度为76
+const SingleLight = LightsLong / 23
 const emits = defineEmits(["pallent-set", "cancle-pallent"]);
 const Canle = () => {
     emits("cancle-pallent");
 }
 const Enterpallent = () => {
     console.log(pallentList)
-    const list = []
+    const list: any = []
     let has = false
     pallentList.forEach((item: any) => {
         if (item.num != 0) {
@@ -20,10 +24,10 @@ const Enterpallent = () => {
     });
     //如果全部为0  设置一个托盘
     if (has == false) {
-        pallentList[0].num = 24
+        pallentList[0].num = LightsLong
     }
-    for (let n of pallentList) {
-        list.push(n.num)
+    for (let i in pallentList) {
+        list.push(pallentList[i].num)
     }
     emits("pallent-set", list);
 }
@@ -31,30 +35,38 @@ const Enterpallent = () => {
 
 const pallentList: any = reactive([
     {
-        name: '一层',
+        name: 'setting.yiceng',
         num: 0,
         sel: true
     },
     {
-        name: '二层',
+        name: 'setting.erceng',
         num: 0,
         sel: true
     },
     {
-        name: '三层',
+        name: 'setting.sanceng',
         num: 0,
         sel: true
     },
     {
-        name: '四层',
+        name: 'setting.siceng',
         num: 0,
         sel: false
     }
 ])
 
-for (let i = 0; i < props.pallet.length; i++) {
-    pallentList[i].num = props.pallet[i]
-    if (props.pallet[i] != 0) {
+const lightlong = props.pallet.reduce((pre: number, item: any) => {
+    return pre + parseInt(item)
+}, 0)
+let lights = props.pallet
+//如果总长度大于23
+if (lightlong > 76) {
+    lights = [20, 20, 20, 0]
+}
+for (let i = 0; i < lights.length; i++) {
+    pallentList[i].num = parseInt(lights[i])
+    if (lights[i] != 0) {
         pallentList[i].sel = true
     }
 }
@@ -63,10 +75,13 @@ function blurNumber(e: any, index: any) {
     if (!e.num) {
         pallentList[index].num = 0;
     }
+    if (e.num < SingleLight) {
+        pallentList[index].num = 0;
+    }
 }
 function setNum(e: any, index: number) {
-    if (Numtotal() > 24) {
-        toast.show("总数量不得大于24")
+    if (Numtotal() > LightsLong) {
+        toast.show(t('setting.zslbdcg'))
         pallentList[index].num = 0
     }
 }
@@ -74,9 +89,10 @@ function Numtotal() {
     let total = 0
     pallentList.forEach((item: any) => {
         if (item.num) {
-            total += item.num
+            total += Number(item.num)
         }
     });
+    console.log(total)
     return total
 }
 
@@ -94,31 +110,31 @@ function Numtotal() {
     <div class="pallent_cont" v-if="showPallent">
         <div class="pallent_center">
             <div class="change_cont font6">
-                托盘设置
+                {{$t('setting.tpsz')}}
             </div>
             <div class="pallent_list">
                 <div v-for="(item,index) in pallentList" :key="index">
-                    <div class="p_top_let">{{item.name}}</div>
+                    <div class="p_top_let">{{$t(item.name)}}</div>
                     <div class="p_top_right">
                         <img v-if="item.num==0" src="../../../assets/img/selout.png" />
                         <img v-else src="../../../assets/img/language1.png" />
 
                         <!-- <img :src="item.num!=0?'/src/assets/img/language1.png':'/src/assets/img/selout.png'" /> -->
                     </div>
-                    <div class="p_bottom_left">灯带数量设置</div>
+                    <div class="p_bottom_left">{{$t('setting.ddslsz')}}</div>
                     <div class="p_bottom_right">
                         <div class="place_cont">
                             <input type="number" class="placeinput" v-model="item.num" @blur="blurNumber(item,index)"
                                 @input="setNum($event,index)">
                         </div>
-                        <span class="num">个</span>
+                        <span class="num">cm</span>
                     </div>
                 </div>
             </div>
 
             <div class="pallent_meth font7">
-                <div @click="Canle">取消</div>
-                <div @click="Enterpallent">确认</div>
+                <div @click="Canle">{{$t('index.qx')}}</div>
+                <div @click="Enterpallent">{{$t('index.qd')}}</div>
             </div>
         </div>
     </div>

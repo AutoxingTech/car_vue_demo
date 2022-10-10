@@ -3,6 +3,8 @@ import { StandbyPoint, ChargingPile, songlist } from '../js/Datacollation'
 import store from '../store'
 import { useLoading } from 'vue3-loading-overlay';
 import { webRefresh, app } from './android'
+import router from '../router';
+import { ActionType } from "../js/globalConfig"
 export const Loading = useLoading()
 export const ControlLoading = (e: boolean) => {
     if (e) {
@@ -40,10 +42,9 @@ export default {
     },
     //充电桩复位
     setPos: (item: any) => {
-        return robotUtil.resetMap(item.areaId).then(() => {
-            return robotUtil.resetPose({ x: item.coordinate[0], y: item.coordinate[1], yaw: item.yaw })
-        })
+        return robotUtil.resetPose({ x: item.coordinate[0], y: item.coordinate[1], yaw: item.yaw, areaId: item.areaId })
     },
+
     //返航 取待命点
     getStandbyStation: () => {
         const useStore: any = store()
@@ -62,9 +63,7 @@ export default {
         if (station == null && returnPoin.length > 0) {
             station = returnPoin[0]
         }
-        if (station.type == 9) {
-            station.is_charging = true
-        }
+
         return station
     },
 
@@ -86,12 +85,12 @@ export default {
         if (station == null && powerPoint.length > 0) {
             station = powerPoint[0]
         }
-        station.is_charging = true
         return station
     },
 
     //回桩充电
     goCharpile: (standby: any) => {
+        robotUtil.setGocharTime()
         const useStore: any = store()
         let task = {
             name: "充电任务" + new Date().getTime(),
@@ -104,7 +103,7 @@ export default {
                 },
                 stepActs: [
                     {
-                        type: 41,  //设置速度
+                        type: ActionType.SetSpeed,  //设置速度
                         data: {
                             speed: useStore.customSetting.delivery.runSpeed / 100
                         }
@@ -112,13 +111,14 @@ export default {
                 ],
             },
             pts: [{
+                type: standby.type,
                 x: standby.coordinate[0],
                 y: standby.coordinate[1],
                 yaw: standby.yaw,
+                areaId: standby.areaId,
                 ext: {
                     name: standby.name,
-                    id: standby.id,
-                    areaId: standby.areaId
+                    id: standby.id
                 },
                 stepActs: [
 
@@ -143,7 +143,7 @@ export default {
                 },
                 stepActs: [
                     {
-                        type: 41,  //设置速度
+                        type: ActionType.SetSpeed,  //设置速度
                         data: {
                             speed: useStore.customSetting.delivery.runSpeed / 100
                         }
@@ -151,13 +151,14 @@ export default {
                 ],
             },
             pts: [{
+                type: standby.type,
                 x: standby.coordinate[0],
                 y: standby.coordinate[1],
                 yaw: standby.yaw,
+                areaId: standby.areaId,
                 ext: {
                     name: "返航中",
-                    id: standby.id,
-                    areaId: standby.areaId
+                    id: standby.id
                 },
                 stepActs: [
                 ],
@@ -187,8 +188,21 @@ export default {
             song = songlists[0]
         }
         return song.id
-    }
+    },
 
+    //异常对话框
 
-
+    AbnormalControl: (e: number) => {
+        if (e != 0) {
+            if (router.currentRoute.value.path != "/crashstop" && router.currentRoute.value.path != "/ficsetting") {
+                store().$patch((state: any) => {
+                    state.showAbnormal = e
+                })
+            }
+        } else {
+            store().$patch((state: any) => {
+                state.showAbnormal = 0
+            })
+        }
+    },
 }

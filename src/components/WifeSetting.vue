@@ -3,7 +3,7 @@
         <div class="landscape horizontal" style="width: 1204px;height: 74px;margin: 0 auto;">
             <navbarVue :heights="'79'" />
         </div>
-        <div class="container" :style="safeHeight" style="width: 95%;">
+        <div class="container" :style="safeHeight">
             <div class="section">
                 <div class="cell">
                     <text class="title" style="color: #5677E7;" @click="goLogPage">WIFI</text>
@@ -24,16 +24,18 @@
                     <div class="cell_line"></div>
                 </div>
             </div>
-        </div>
-        <div v-if="skipShow" class="flexColumnCenter btnSubmit" @click="onSkip">
-            <text style="color: #FFFFFF;font-size: 23px;font-weight: bold;">{{btnTitle}}({{timeLimit}})</text>
+
+            <div v-if="skipShow" class="flexColumnCenter btnSubmit" @click="onSkip">
+                <text style="color: #FFFFFF;font-size: 23px;font-weight: bold;">{{btnTitle}}({{timeLimit}})</text>
+            </div>
         </div>
     </div>
 
     <div class="model_on" v-if="modelshow!=0">
         <div class="on1">
             <div>{{currentwife.ssid}}</div>
-            <div class="inp"> <input type="text" placeholder="请输入密码" v-model="password" v-if="modelshow==2"> </div>
+            <div :class="modelshow==2?'inp':'inp2'"> <input type="text" placeholder="请输入密码" v-model="password"
+                    v-if="modelshow==2"> </div>
             <div class="bottom_tip">
                 <div @click="canclmodel">取消</div>
                 <div @click="forgetpass" v-if="modelshow==1">忘记网络</div>
@@ -50,6 +52,7 @@ export default defineComponent({
     beforeRouteEnter(to, from, next) {
         next((vm) => {
             const instance: any = vm;
+            instance.onTimeLimit()
             //检查是否开启wife
             wifi_command({ event: 'enable' })
             const wifeEnablewatch = watch(
@@ -186,10 +189,11 @@ import { computed } from '@vue/reactivity';
 import { reactive, ref } from 'vue';
 import Soundswitch from '../components/Setting/component/WifSwitch.vue'
 import { wifi_command, wifeEnable, wifeList, wifeInfo, wifecontentstatue, forgetwife, connectwife, wifeEvent } from "../js/android";
-const skipShow = ref(false)  //跳过按钮
-const wifiEnable = ref(false)  //开启wife
+import router from '../router';
+const skipShow = ref(true)  //跳过按钮
+const wifiEnable = ref(true)  //开启wife
 const wifiConnecting = ref(false)  //是否连接
-const wifiName = ref('')
+const wifiName = ref('TP-LINK 1007')
 const wifiList: any = reactive([
     {
         ssid: 'TP-LINK 1008',
@@ -201,17 +205,17 @@ const wifiList: any = reactive([
         img: new URL('../assets/img/wifi_icon.png', import.meta.url),
     },
     {
-        ssid: 'TP-LINK 1008',
+        ssid: 'TP-LINK 1007',
         img: new URL('../assets/img/wifi_icon.png', import.meta.url),
     },
     {
-        ssid: 'TP-LINK 1008',
+        ssid: 'TP-LINK 1006',
         img: new URL('../assets/img/wifi_icon.png', import.meta.url),
     }
 ])
 const btnTitle = ref('跳过')  //按钮显示内容
-const timeLimit = ref(300)   //倒计时
-const timeoutId = ref(-1)
+const timeLimit = ref(10)   //倒计时
+let timeoutId: any = ''
 const timeoutIdWifiList = ref(-1)
 const stateToast = ref('')   //提示
 const safeHeight = computed({
@@ -236,6 +240,18 @@ const password = ref('')
 
 const goLogPage = () => {
 }
+
+const onTimeLimit = () => {
+    timeoutId = setTimeout(() => {
+        if (timeLimit.value > 0) {
+            timeLimit.value = timeLimit.value - 1;
+            onTimeLimit();
+        } else {
+            clearTimeout(timeoutId);
+            onSkip();
+        }
+    }, 1000);
+}
 //hideenmodel操作
 const canclmodel = () => {
     modelshow.value = 0
@@ -254,6 +270,8 @@ const connectwifeon = () => {
 //点击wife
 const onWifiConfirm = (e: any) => {
     currentwife.value = e
+    console.log(currentwife.value, "当前wife")
+    console.log(wifiName.value, "无线名称")
     if (wifiName.value == e.ssid) {
         modelshow.value = 1
     } else {
@@ -265,12 +283,16 @@ const onWifiConfirm = (e: any) => {
     }
 }
 const onSkip = () => {
+    clearTimeout(timeoutId)
+    timeLimit.value = 300
+    router.back()
 }
 const Changeswitch = (e: boolean) => {
     // wifi_command({ event: 'setEnable', enable: !wifiEnable.value })
     wifiEnable.value = !wifiEnable.value
+    console.log(e, "当前状态")
 }
-defineExpose({ wifiEnable, wifiName, wifiList, btnTitle, stateToast, timeoutIdWifiList, wifiConnecting });
+defineExpose({ wifiEnable, wifiName, wifiList, btnTitle, stateToast, timeoutIdWifiList, wifiConnecting, onTimeLimit });
 </script>
 
 
@@ -287,6 +309,7 @@ page {
 .container {
     width: 100%;
     padding: 0 45px;
+    box-sizing: border-box;
 }
 
 .section {
@@ -335,11 +358,16 @@ page {
 }
 
 .btnSubmit {
-    margin-top: 10px;
     background-color: #5677E7;
     border-radius: 16px;
     height: 64px;
     width: 180px;
+    position: fixed;
+    left: 50%;
+    margin-left: -90px;
+    line-height: 64px;
+    text-align: center;
+    bottom: 10px;
 }
 
 .model_on {
@@ -400,9 +428,21 @@ page {
     height: 50px;
     width: 400px;
     margin: 0 auto;
-
     border-bottom: 1px solid #999999;
+}
 
+.inp2 {
+    height: 50px;
+    width: 400px;
+    margin: 0 auto;
+}
+
+.inp2>input {
+    width: 100%;
+    height: 100%;
+    border: none;
+    outline: none;
+    font-size: 22px;
 }
 
 .inp>input {

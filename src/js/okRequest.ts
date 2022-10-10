@@ -2,7 +2,7 @@ import { baseUrl } from "../js/globalConfig"
 import { Axios } from "axios"
 import { globalData } from "../js/globalData"
 import { ControlLoading } from '../js/settingUtil'
-import store from "../store";
+import settingUtil from "../js/settingUtil"
 
 const instance = new Axios({
     baseURL: baseUrl,
@@ -77,9 +77,7 @@ function request(path: string, data: any = {}, method: string = "POST", commonfa
                 if (commonfail == true) {
                     //todo 调用通用错误处理
                     console.log("异常内容", err)
-                    store().$patch((state: any) => {
-                        state.showAbnormal = 1
-                    })
+                    settingUtil.AbnormalControl(1)
                     return new Promise(() => { })
                 } else {
                     ControlLoading(false)
@@ -96,7 +94,7 @@ export const okRequest = {
      * 机器人信息
      */
     robotInfo() {
-        return request("/robot_soft/info?robotId=" + globalData.sn, null, "get")
+        return request("/robot_soft/info?robotId=" + globalData.sn, null, "get", false)
     },
     /**
      * 检查更新
@@ -109,7 +107,7 @@ export const okRequest = {
             packageType: packageType,
             businessType: businessType,
             robotSN: globalData.sn
-        }))
+        }), "post", false)
     },
 
     /**
@@ -124,15 +122,18 @@ export const okRequest = {
      */
     upload_setting(data: object) {
         console.log(data, "param")
-        return request("/robot_soft/save", JSON.stringify(data))
+        return request("/robot_soft/save", JSON.stringify(data), "post", false).catch((err) => {
+            return new Promise(() => { })
+        })
     },
 
     /**
     * 巡游列表信息
     */
     CuriseList() {
-        return Promise.resolve([])
-        // return request("/cruise/list?businessId=" + globalData.businessId, null, "get")
+        return request("/cruise/list?businessId=" + globalData.businessId, null, "get", false).catch(()=>{
+            return Promise.resolve([])
+        })
     },
 
     /**
@@ -145,7 +146,12 @@ export const okRequest = {
     *}
     */
     // return okRequest.broadcast_effect({ "businessId": globalData.businessId, "businessType": 1, "taskType": 3, "robotId": globalData.sn })
-    broadcast_effect(data: object) {
-        return request("/broadcast/effect", JSON.stringify(data))
+    broadcast_effect(data: object, commonfail: boolean = true) {
+        return request("/broadcast/effect", JSON.stringify(data), "post", commonfail).then((res) => {
+            if (res == null) {
+                res = []
+            }
+            return Promise.resolve(res)
+        })
     }
 }

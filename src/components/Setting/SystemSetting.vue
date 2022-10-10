@@ -11,13 +11,16 @@ import { toast } from '../Toast/Toast'
 import { OpenSetting, appVersion } from '../../js/android'
 import { H5Version } from '../../js/globalConfig'
 import router from '../../router';
+import { useI18n } from 'vue-i18n'
+import { getLocale } from '../../main'
+const { locale, t } = useI18n()
 
 let ChargingPileList: any = ChargingPile
 const useStore: any = store()
 const CurrentappVersion = ref(appVersion())
 const modetype: any = reactive([{
     id: 1,
-    name: '自动模式',
+    name: 'setting.zdms',
     sel: true,
     img1: new URL('../../assets/img/sys_1notsel.png', import.meta.url),  //未选中
     img2: new URL('../../assets/img/sys_1.png', import.meta.url),  //选中
@@ -25,40 +28,41 @@ const modetype: any = reactive([{
 },
 {
     id: 2,
-    name: '手动模式',
+    name: 'setting.sdms',
     sel: false,
     img1: new URL('../../assets/img/sys_2.png', import.meta.url),  //未选中
     img2: new URL('../../assets/img/sys_1sel.png', import.meta.url),
 },
 {
     id: 3,
-    name: '重启APP',
+    name: 'setting.cqapp',
     sel: false,
     img1: new URL('../../assets/img/sys_3.png', import.meta.url),
     img2: new URL('../../assets/img/sys_3.png', import.meta.url),
 }, {
     id: 4,
-    name: '充电桩复位',
+    name: 'setting.cdzfw',
     sel: false,
     img1: new URL('../../assets/img/sys_4.png', import.meta.url),
     img2: new URL('../../assets/img/sys_4.png', import.meta.url),
 }, {
     id: 5,
-    name: '系统设置',
+    name: 'starup.xtsz',
     sel: false,
     img1: new URL('../../assets/img/sys_5.png', import.meta.url),
     img2: new URL('../../assets/img/sys_5.png', import.meta.url),
 },
 {
     id: 6,
-    name: 'WLAN',
+    name: 'setting.wlan',
     sel: false,
     img1: new URL('../../assets/img/sys_6.png', import.meta.url),
     img2: new URL('../../assets/img/sys_6.png', import.meta.url),
 }
 ])
 const showChangeLan = ref(false)  //是否显示选择语言弹框
-const currentLanguage = ref(useStore.customSetting.basic.language)  //当前的语言
+
+const currentLanguage = ref(getLocale())  //当前的语言
 const showTapApk = ref(false)  //是否显示跳转apk
 const showchangePass = ref(false)//是否显示更改密码
 
@@ -66,22 +70,23 @@ const password1 = ref() //原密码
 const password2 = ref() //新密码
 const password3 = ref() //确认新密码
 //控制只能输入四个
-const setinput = (e: number) => {
+const setinputc = (item: any, e: number) => {
     if (e == 1) {
-        if (String(password1.value).length > 10) {
+        if (password1.value.length > 10) {
             password1.value = String(password1.value).slice(0, 10)
         }
     } else if (e == 2) {
-        if (String(password2.value).length > 10) {
+        if (password2.value.length > 10) {
             password2.value = String(password2.value).slice(0, 10)
         }
     } else if (e == 3) {
-        if (String(password3.value).length > 10) {
+        if (password3.value.length > 10) {
             password3.value = String(password3.value).slice(0, 10)
         }
     }
 
 }
+
 //控制修改密码的显示和隐藏
 const tapChangepass = () => {
     password1.value = ''
@@ -99,19 +104,19 @@ const Changepassword = () => {
                         state.customSetting.basic.adminPass = password2.value
                     })
                     tapChangepass()
-                    toast.show('修改成功')
+                    toast.show(t('setting.xgcg'))
                 } else {
-                    toast.show('新密码与原密码相同')
+                    toast.show(t('setting.xmmyymmxt'))
                 }
             } else {
-                toast.show('两次输入密码不相同')
+                toast.show(t('setting.lcsrmmbxt'))
             }
         } else {
-            toast.show('原密码不正确')
+            toast.show(t('setting.ymmbzq'))
         }
 
     } else {
-        toast.show('请完善更改内容')
+        toast.show(t('setting.qwsggnr'))
     }
     //todo
     // showchangePass.value = !showchangePass.value
@@ -132,9 +137,8 @@ const Changelanguage = () => {
 //修改语言确定
 const Setlanguage = (e: any) => {
     currentLanguage.value = e
-    useStore.$patch((state: any) => {
-        state.customSetting.basic.language = e
-    })
+    localStorage.setItem('language', e)
+    locale.value = e
     showChangeLan.value = !showChangeLan.value
 }
 //点击便捷功能
@@ -185,12 +189,12 @@ const ModelClick = (e: number) => {
 </script>
 <template>
     <div>
-        <switchLanguage @Changelanguage="Changelanguage" :currentLanguage="currentLanguage"
+        <switchLanguage @changelanguage="Changelanguage" :currentLanguage="currentLanguage"
             :showChangeLan="showChangeLan" @last-changelan="Setlanguage">
         </switchLanguage>
         <div>
             <div class="sys_top">
-                <div class="sys_bj font4">便捷功能</div>
+                <div class="sys_bj font4">{{$t('setting.bjgn')}}</div>
                 <div class="sys_modetype">
                     <!-- :class="item.sel?'sys_mode_one2':'sys_mode_one'"  -->
                     <div v-for="(item,index) in modetype" :key="index"
@@ -204,11 +208,13 @@ const ModelClick = (e: number) => {
                             style="width:38px;height: 38px;margin-bottom: 13px;">
 
                         <!-- <img :src="item.img1" alt="" style="width:38px;height: 38px;margin-bottom: 13px;" /> -->
-                        <div v-if="index==0" :style="!useStore.robotstate.isManualMode?'color:white':''">{{item.name}}
+                        <div v-if="index==0" :style="!useStore.robotstate.isManualMode?'color:white':''">
+                            {{$t(item.name)}}
                         </div>
-                        <div v-if="index==1" :style="useStore.robotstate.isManualMode?'color:white':''">{{item.name}}
+                        <div v-if="index==1" :style="useStore.robotstate.isManualMode?'color:white':''">
+                            {{$t(item.name)}}
                         </div>
-                        <div v-if="index>1">{{item.name}}</div>
+                        <div v-if="index>1">{{$t(item.name)}}</div>
                     </div>
                 </div>
             </div>
@@ -216,23 +222,23 @@ const ModelClick = (e: number) => {
         <div class="sys_setting" @click="Changelanguage()">
             <div>
                 <div>
-                    <span class="sys_span1 font4">多语言设置</span>
+                    <span class="sys_span1 font4">{{$t('setting.dyysz')}}</span>
                 </div>
-                <div>切换语言</div>
+                <div>{{$t('setting.qhyy')}}</div>
 
                 <div class="now_lan">
-                    <span v-if="currentLanguage=='zh-Hans'">简体中文</span>
+                    <span v-if="currentLanguage=='zh-cn'">简体中文</span>
                     <span v-if="currentLanguage=='en'">English</span>
-                    <span v-if="currentLanguage=='zh-Hant'">繁体中文</span>
+                    <span v-if="currentLanguage=='zh-tw'">繁体中文</span>
                 </div>
             </div>
         </div>
         <div class="sys_setting" @click="tapChangepass()">
             <div>
                 <div>
-                    <span class="sys_span1 font4">管理员密码</span>
+                    <span class="sys_span1 font4">{{$t('setting.glymm')}}</span>
                 </div>
-                <div>修改密码</div>
+                <div>{{$t('setting.xgmm')}}</div>
             </div>
         </div>
         <!-- <div class="sys_setting">
@@ -244,73 +250,82 @@ const ModelClick = (e: number) => {
             </div>
         </div> -->
         <div class="sys_message">
-            <div class="sys_message_top font4">系统信息</div>
+            <div class="sys_message_top font4">{{$t('setting.xtxx')}}</div>
             <!-- <div class="sys_onemessage">
                 <div>机器人类型</div>
                 <div>R1餐厅机器人</div>
             </div> -->
 
             <div class="sys_onemessage">
-                <div>机器人SN</div>
+                <div>{{$t('setting.jqrsn')}}</div>
                 <div>{{globalData.sn}}</div>
             </div>
 
             <div class="sys_onemessage">
-                <div>机器人版本</div>
+                <div>{{$t('setting.jqrbb')}}</div>
                 <div>{{H5Version}} ({{CurrentappVersion.split(',')[1]}})</div>
             </div>
-            <div class="sys_onemessage noborder">
-                <div>机器人底盘版本</div>
-                <div>{{useStore.vers}}</div>
+            <div class="sys_onemessage">
+                <div>{{$t('setting.jqrdpbb')}}</div>
+                <div>
+                    <span v-if="useStore.vers">{{useStore.vers}}</span>
+                    <span v-else>{{$t('setting.zwsj')}}</span>
+                </div>
             </div>
-            <!-- <div class="sys_onemessage noborder">
-                <div>机器人部署时间</div>
-                <div>2022-01-11</div>
-            </div> -->
+            <div class="sys_onemessage noborder">
+                <div>{{$t('setting.jqrsdkbb')}}</div>
+                <div>
+                    <span v-if="useStore.sdkVers">{{useStore.sdkVers}}</span>
+                    <span v-else>{{$t('setting.zwsj')}}</span>
+                </div>
+            </div>
         </div>
         <div class="emptyline"></div>
         <div class="mask_tapapk" v-if="showTapApk">
             <div class="_makcontent">
                 <div class="tip_apk">
-                    是否跳转至车机建图app
+                    {{$t('setting.sftz')}}
                 </div>
                 <div class="tip_meth">
-                    <div @click="TapApkControl">否</div>
-                    <div @click="TapAPK">是</div>
+                    <div @click="TapApkControl">否 {{$t('setting.fou')}}</div>
+                    <div @click="TapAPK">是{{$t('setting.shi')}}</div>
                 </div>
             </div>
         </div>
         <!-- 修改密码 -->
         <div class="update_password" v-if="showchangePass">
             <div class="_makcontent2">
-                <div class="update_password_header font6">修改密码</div>
+                <div class="update_password_header font6">{{$t('setting.xgmm')}}</div>
                 <div class="password_cont">
                     <div class="passwrod_line">
                         <div>
-                            原密码:
+                            {{$t('setting.ymm')}}:
                         </div>
-                        <input type="number" placeholder="请输入原密码" maxlength=4 v-model="password1" @input="setinput(1)"
+                        <input type="tel" pattern="[0-9]*" :placeholder="$t('setting.qsrymm')" v-model="password1"
+                            onkeyup="value=value.replace(/[^\d]/g,'')" @input="setinputc($event,1)"
                             style="-webkit-text-security:disc" />
                     </div>
                     <div class="passwrod_line">
                         <div>
-                            新密码:
+                            {{$t('setting.xmm')}}:
                         </div>
-                        <input type="number" placeholder="请输入新密码" maxlength=4 v-model="password2" @input="setinput(2)"
+                        <input type="tel" pattern="[0-9]*" :placeholder="$t('setting.qsrxmm')" v-model="password2"
+                            onkeyup="value=value.replace(/[^\d]/g,'')" @input="setinputc($event,2)"
                             style="-webkit-text-security:disc">
                     </div>
                     <div class="passwrod_line" style="margin-bottom:0">
                         <div>
-                            再次输入新密码:
+                            {{$t('setting.zcsrmm')}}:
                         </div>
-                        <input type="number" placeholder="确认新密码" maxlength=4 v-model="password3" @input="setinput(3)"
+                        <input type="tel" pattern="[0-9]*" :placeholder="$t('setting.xrxmm')" v-model="password3"
+                            onkeyup="value=value.replace(/[^\d]/g,'')" @input="setinputc($event,3)"
                             style="-webkit-text-security:disc">
                     </div>
                 </div>
 
                 <div class="tip_meth">
-                    <div @click="tapChangepass">取消</div>
-                    <div @click="Changepassword">确定</div>
+                    <div @click="tapChangepass">{{$t('index.qx')}}</div>
+                    <div @click="Changepassword">{{$t('index.qd')}}</div>
                 </div>
 
             </div>

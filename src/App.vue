@@ -4,6 +4,7 @@ import './style/font1.less'
 import { onMounted } from '@vue/runtime-core';
 import { setWin } from "./js/android"
 import Abnormal from '../src/components/Abnormal.vue'
+import Rlog from '../src/components/Rlog.vue'
 import 'vue3-loading-overlay/dist/vue3-loading-overlay.css';
 const button = document.getElementById('app') as HTMLButtonElement;
 button.setAttribute("class", "theme_0");
@@ -21,6 +22,7 @@ onMounted(() => {
 <template>
   <div class="all">
     <Abnormal></Abnormal>
+    <Rlog></Rlog>
     <router-view v-slot="{ Component }">
       <keep-alive>
         <component :is="Component"></component>

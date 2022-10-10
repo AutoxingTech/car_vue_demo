@@ -95,14 +95,14 @@ const changesong = (e: any) => {
         </div>
         <div class="volive_control">
             <div class="volice1">
-                <div class="font4">声音控制</div>
+                <div class="font4">{{$t('setting.sykz')}}</div>
                 <div>
                     <my_switch v-model="switchon" @change-switch="Changeswitch"></my_switch>
                 </div>
             </div>
             <div>
                 <div class="one_volice">
-                    <div class="font4">背景音乐</div>
+                    <div class="font4">{{$t('setting.bjyy')}}</div>
                     <div class="volice_change">
                         <img src="../../assets/img/jingyin.png" style="width:28px;height:23px">
                         <div class="center_control">
@@ -115,7 +115,7 @@ const changesong = (e: any) => {
             </div>
             <div>
                 <div class="one_volice">
-                    <div class="font4">播报语言</div>
+                    <div class="font4">{{$t('setting.bbyy')}}</div>
                     <div class="volice_change">
                         <img src="../../assets/img/jingyin.png" style="width:28px;height:23px">
                         <div class="center_control">
@@ -128,7 +128,7 @@ const changesong = (e: any) => {
             </div>
             <div>
                 <div class="one_volice">
-                    <div class="font4">避障提示</div>
+                    <div class="font4">{{$t('setting.bzts')}}</div>
                     <div class="volice_change">
                         <img src="../../assets/img/jingyin.png" style="width:28px;height:23px">
                         <div class="center_control">
@@ -142,7 +142,7 @@ const changesong = (e: any) => {
         </div>
 
         <div class="vone_setbox" @click="TankControl">
-            <div class="vsetname font4">背景音乐选择</div>
+            <div class="vsetname font4">{{$t('setting.bjyyxz')}}</div>
             <div class="vbox_rightset">
                 <div class="font5" style="margin-right:20px">{{defaultsongname}}</div>
                 <img src="../../assets/img/setting_arrow_down.png" style="width: 16px;height: 9px;">

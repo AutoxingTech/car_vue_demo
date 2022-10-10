@@ -44,5 +44,6 @@ const msg: any = props.msg
 
 .mask_totaltip>div:nth-child(2) {
     text-align: center;
+    font-size: 23px;
 }
 </style>

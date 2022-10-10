@@ -4,6 +4,7 @@ import { CrashStatus } from '../js/globalData';
 import { robotUtil } from '../js/robotUtil';
 import settingUtil from '../js/settingUtil';
 import router from '../router';
+import store from '../store';
 export default defineComponent({
     setup() {
         let obj = reactive({
@@ -21,12 +22,22 @@ export default defineComponent({
         function gostay() {
             console.log("gostay")
             CrashStatus.value = 2
-            robotUtil.cancelEmergencyStop().then((res: any) => {
-                if (obj.frompath == '/task') {
-                    robotUtil.cancelTask()
-                }
-                router.back()
-            })
+            if (obj.frompath == '/task') {
+                robotUtil.cancelTask().then(() => {
+                    robotUtil.cancelEmergencyStop().then((res: any) => {
+                        if(router.currentRoute.value.path=="/crashstop"){
+                            router.go(-2)
+                        }else{
+                            router.go(-1)
+                        }
+                    })
+                })
+            } else {
+                robotUtil.cancelEmergencyStop().then((res: any) => {
+                    router.back()
+                })
+            }
+
         }
 
         function gochar() {
@@ -49,6 +60,9 @@ export default defineComponent({
         next((e: any) => {
             e.obj.frompath = from.fullPath
             CrashStatus.value = 0
+            store().$patch((state: any) => {
+                state.showAbnormal = 0
+            })
         })
     },
 })
@@ -60,10 +74,10 @@ export default defineComponent({
     <div class="float3"></div>
     <div class="tip"></div>
     <div class="crash_tip">
-        <div class="tip1">您已按下</div>
-        <div class="tip2">急停按钮</div>
+        <div class="tip1">{{$t('crash.nyax')}}</div>
+        <div class="tip2">{{$t('crash.jtan')}}</div>
     </div>
-    <div class="tip3">可以自由推行机器人</div>
+    <div class="tip3">可以自由推行机器人{{$t('crash.kyzytxjqr')}}</div>
     <div class="crash_center">
         <div class="enter_logo">
             <div class="logo_center">
@@ -71,25 +85,25 @@ export default defineComponent({
             </div>
         </div>
         <div class="crash_choice" @click="goon" style="box-shadow: 0 0px 40px 0px #83A9FF;">
-            <div class="li1">继续任务</div>
+            <div class="li1">{{$t('crash.jxrw')}}</div>
             <div class="taskonimg">
                 <img src="../assets/img/crashstopic1.png" style="width:100%;height: 100%;">
             </div>
         </div>
         <div class="crash_choice" @click="gochar">
-            <div class="li2">返回充电</div>
+            <div class="li2">{{$t('crash.fhcs')}}</div>
             <div class="taskonimg2">
                 <img src="../assets/img/crashico2.png" style="width:100%;height: 100%;">
             </div>
         </div>
         <div class="crash_choice" @click="gostay">
-            <div class="li3">原地待命</div>
+            <div class="li3">{{$t('crash.yddm')}}</div>
             <div class="taskonimg">
                 <img src="../assets/img/crashico3.png" style="width:100%;height: 100%;">
             </div>
         </div>
         <div class="crash_choice" @click="goit">
-            <div class="li4">返回待命点</div>
+            <div class="li4">{{$t('crash.fhdmd')}}</div>
             <div class="taskonimg2">
                 <img src="../assets/img/crashico4.png" style="width:100%;height: 100%;">
             </div>

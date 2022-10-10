@@ -28,31 +28,31 @@ const current_Set = ref(0)
 const setList: any = [
     {
         id: 0,
-        name: '基础设置',
+        name: 'setting.jcsz',
         img: new URL('../assets/img/setleft1sel.png', import.meta.url),
         img2: new URL('../assets/img/setleft1nosel.png', import.meta.url),
     },
     {
         id: 1,
-        name: '声音设置',
+        name: 'setting.sysz',
         img: new URL('../assets/img/setleft2sel.png', import.meta.url),
         img2: new URL('../assets/img/setleft2nosel.png', import.meta.url),
     },
     {
         id: 2,
-        name: '送餐设置',
+        name: 'setting.scsz',
         img: new URL('../assets/img/setleft3sel.png', import.meta.url),
         img2: new URL('../assets/img/setleft3nosel.png', import.meta.url),
     },
     {
         id: 3,
-        name: '巡游设置',
+        name: 'setting.xysz',
         img: new URL('../assets/img/setleft4sel.png', import.meta.url),
         img2: new URL('../assets/img/setleft4nosel.png', import.meta.url),
     },
     {
         id: 4,
-        name: '系统设置',
+        name: 'starup.xtsz',
         img: new URL('../assets/img/setleft5sel.png', import.meta.url),
         img2: new URL('../assets/img/setleft5nosel.png', import.meta.url),
     }
@@ -95,7 +95,7 @@ export default defineComponent({
 </script>
 
 <template>
-    <SettingPassVue :PasswordControl="PasswordControl" @passback="passback" @passin="hiddenPass" />
+    <SettingPassVue :PasswordControl="PasswordControl" @passback="passback" @passin="hiddenPass" :defautType="0" />
     <div class=" all">
         <div class="tip">
             <navbarVue :heights="'84'" />
@@ -103,18 +103,18 @@ export default defineComponent({
         <div class="set_content">
             <div class="set_left">
                 <div class="set_font1">
-                    设置管理
+                    {{$t('setting.szgl')}}
                 </div>
                 <div class="set_list">
                     <div class="set_control" v-for="(item,index) in setList" :key="index" @click="selectCurrent(index)">
                         <div class="gip" v-if="current_Set==index"></div>
                         <div :class="current_Set==index?'control_box':'control_box2'">
                             <img :src="current_Set==index?item.img:item.img2">
-                            <div>{{item.name}}</div>
+                            <div>{{$t(item.name)}}</div>
                         </div>
                     </div>
                 </div>
-                <div class="exit_set" @click="exitSetting">退出设置</div>
+                <div class="exit_set" @click="exitSetting">{{$t('setting.tcsz')}}</div>
             </div>
 
             <div class="set_right">

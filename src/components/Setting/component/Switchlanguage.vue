@@ -7,19 +7,20 @@ const props =
         showChangeLan: boolean,
         currentLanguage: string
     }>()
-const emits = defineEmits(["Changelanguage", 'last-changelan']);
+const emits = defineEmits(["changelanguage", 'last-changelan']);
 const currentLanguage = ref(props.currentLanguage)
 //取消
 const Canclechange = () => {
     currentLanguage.value = props.currentLanguage
-    emits("Changelanguage");
+    emits("changelanguage");
 
 }
+
 const languagelist = reactive([
     {
         language: '简体中文',
         desc: '简体中文',
-        char: 'zh-Hans'
+        char: 'zh-cn'
 
     },
     {
@@ -30,7 +31,7 @@ const languagelist = reactive([
     {
         language: '繁体中文',
         desc: '繁体',
-        char: 'zh-Hant'
+        char: 'zh-tw'
     }
 ])
 const choiceLanguage = (e: any) => {
@@ -45,7 +46,7 @@ const Enerchange = () => {
 <template>
     <div class="mask_on" v-if="showChangeLan">
         <div class="change_cont">
-            <div class="language_top font6">多语言列表</div>
+            <div class="language_top font6">{{$t('setting.dyylb')}}</div>
             <div class="language_center">
                 <div v-for="(item,index) in languagelist" :key="index" @click="choiceLanguage(item)">
                     <div class="language_center_left">
@@ -64,8 +65,8 @@ const Enerchange = () => {
             </div>
 
             <div class="language_meth font7">
-                <div @click="Canclechange">取消</div>
-                <div @click="Enerchange">切换语言</div>
+                <div @click="Canclechange">{{$t('index.qx')}}</div>
+                <div @click="Enerchange">{{$t('setting.qhyy')}}</div>
             </div>
         </div>
 

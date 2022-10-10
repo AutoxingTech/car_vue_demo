@@ -8,15 +8,8 @@ let curTime: any = 0 //当前时间戳
 let lastTime: any = 0 //最后一次点击的时间戳
 //关闭异常弹框 操作
 const closeAbor = () => {
-    if (router.currentRoute.value.path == "/starup") {
-        location.reload()
-    } else {
-        settingUtil.restart()
-        storeMe.$patch((state: any) => {
-            state.showAbnormal = 0
-        })
-    }
-
+    settingUtil.restart() //重启
+    settingUtil.AbnormalControl(0)
 }
 const cleanData = () => {
     tap_num = 0
@@ -32,19 +25,13 @@ const startBluetooth = () => {
     } else if (tap_num == 10) {
         if (curTime - lastTime < 3000) {
             cleanData()
-            storeMe.$patch((state: any) => {
-                state.showAbnormal = 0
-            })
-            console.log(router.currentRoute.value.path)
+            settingUtil.AbnormalControl(0)
             //不再启动页或者模拟设置页面 关闭弹框并且回到首页
             if (router.currentRoute.value.path !== "/starup" && router.currentRoute.value.path !== "/ficsetting" && router.currentRoute.value.path.indexOf('/index') < 0) {
                 router.replace({
                     path: '/index'
                 })
             }
-            return;
-        } else {
-            cleanData()
             return;
         }
     } else {
@@ -65,9 +52,9 @@ const startBluetooth = () => {
                 <div class="ico_sty" @click="startBluetooth">
                     <img src="../assets/img/robotstop.png" style="width:100%;height: 100%;">
                 </div>
-                <div class="tip1">机器人状态异常</div>
-                <div class="tip2">请将机器人推至充电脏重启</div>
-                <div class="enter1" @click="closeAbor">重启</div>
+                <div class="tip1">{{$t('abnormal.jqrztyc')}}</div>
+                <div class="tip2">{{$t('abnormal.qjjqrtz')}}</div>
+                <div class="enter1" @click="closeAbor">{{$t('abnormal.cq')}}</div>
             </div>
         </div>
     </div>
@@ -80,7 +67,7 @@ const startBluetooth = () => {
     bottom: 0;
     left: 0;
     right: 0;
-    z-index: 20;
+    z-index: 9999999999;
     background-color: rgba(0, 0, 0, 0.6);
 }
 

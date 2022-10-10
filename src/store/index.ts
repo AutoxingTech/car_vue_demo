@@ -13,7 +13,10 @@ const store = defineStore('Store', {
             nextpage: 0,  //启动跳转设置 返回时使用判断
             isModify: false,  //是否编辑模式
             reFresh: false,  //是否刷新
-            vers: '' //车机地盘版本
+            vers: '', //车机地盘版本
+            sdkVers: '',  //机器人sdk版本
+            showLogs: false
+
         }
     },
     getters: {

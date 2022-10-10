@@ -2,15 +2,14 @@
 import { onMounted, reactive, ref } from 'vue'
 import store from '../store'
 import router from '../router';
-const useStore = store()
+const useStore: any = store()
 const DataMessage: any = reactive({
-  robotstate: useStore.robotstate,
-  robotsce: '空闲'
+  robotsce: 'nav.kx'
 })
 const time = ref()
 onMounted(() => {
   let page = router.currentRoute.value.fullPath
-  page && page.indexOf("task/task") >= 0 ? DataMessage.robotsce = '任务中' : DataMessage.robotsce = '空闲'
+  page && page.indexOf("task/task") >= 0 ? DataMessage.robotsce = 'nav.rwz' : DataMessage.robotsce = 'nav.kx'
 })
 const timecomp = () => {
   setInterval(() => {
@@ -24,6 +23,11 @@ const timecomp = () => {
   }, 1000)
 }
 timecomp()
+const showLogs = () => {
+  useStore.$patch((state: any) => {
+    state.showLogs = true
+  })
+}
 defineProps<{
   heights: string
 }>()
@@ -32,22 +36,22 @@ defineProps<{
 <template>
   <div class="nav" :style="'height:'+heights+'px'">
     <div class="robot_statu">
-      机器人当前状态:{{DataMessage.robotsce}}
+      {{$t('nav.jqrdqzt')}}:{{$t(DataMessage.robotsce)}}
     </div>
     <div class="barrter">
       <img src="../assets/img/battery.png" class="batterimg">
-      <div class="battercolor" :style="'width:'+(0.29*DataMessage.robotstate.battery)+'px'">
-        <div class="batter100" v-if="DataMessage.robotstate.battery==100">Full</div>
+      <div class="battercolor" :style="'width:'+(0.29*useStore.robotstate.battery)+'px'">
+        <div class="batter100" v-if="useStore.robotstate.battery==100">Full</div>
       </div>
     </div>
-    <img v-if="DataMessage.robotstate.isCharging" class="shandian" src="../assets/img/shandian.png" />
+    <img v-if="useStore.robotstate.isCharging" class="shandian" src="../assets/img/shandian.png" />
     <div class="wift_status" style="  font-weight: normal;color: #1FFF6D;margin-left: 5px;">
-      {{DataMessage.robotstate.battery}}%
+      {{useStore.robotstate.battery}}%
     </div>
     <div class="volice_status">
       <img src="../assets/img/shengyin_shiti.png">
     </div>
-    <div class="wift_status">
+    <div class="wift_status" @click="showLogs">
       {{time}}
     </div>
   </div>

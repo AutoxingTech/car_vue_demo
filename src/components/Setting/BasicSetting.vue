@@ -14,25 +14,25 @@ let pointList: any = reactive({
 //当前模式列表
 const patternList: any = reactive([
     {
-        name: '快捷送餐',
+        name: 'index.kjsc',
         ico1: new URL('../../assets/img/selbase1.png', import.meta.url),
         ico2: new URL('../../assets/img/notselbase1.png', import.meta.url),
         sel: false
     },
     {
-        name: '多点送餐',
+        name: 'index.ddsc',
         ico1: new URL('../../assets/img/selbase2.png', import.meta.url),
         ico2: new URL('../../assets/img/notselbase2.png', import.meta.url),
         sel: false
     },
     {
-        name: '引领送餐',
+        name: 'index.ylsc',
         ico1: new URL('../../assets/img/selbase3.png', import.meta.url),
         ico2: new URL('../../assets/img/notselbase3.png', import.meta.url),
         sel: false
     },
     {
-        name: '巡游',
+        name: 'index.xy',
         ico1: new URL('../../assets/img/selbase4.png', import.meta.url),
         ico2: new URL('../../assets/img/notselbase4.png', import.meta.url),
         sel: false
@@ -62,10 +62,14 @@ const patterTap = (index: number) => {
             patternList[index].sel = !patternList[index].sel
         }
     })
+
+
+    setcurrent()
+
 }
 
 const fontSizetype = ref(0) //当前字号大小 0 小号  1中号 2大号
-if (!useStore.customSetting.basic.fontSize || useStore.customSetting.basic.fontSize != 0 || useStore.customSetting.basic.fontSize != 1 || useStore.customSetting.basic.fontSize != 2) {
+if (!useStore.customSetting.basic.fontSize || (useStore.customSetting.basic.fontSize != 0 && useStore.customSetting.basic.fontSize != 1 && useStore.customSetting.basic.fontSize != 2)) {
     fontSizetype.value = 0
     useStore.$patch((state: any) => {
         state.customSetting.basic.fontSize = 0
@@ -103,6 +107,23 @@ if (!useStore.customSetting.basic.currenttab) {
 } else {
     Defaultdisplay.value = useStore.customSetting.basic.currenttab
 }
+
+
+const setcurrent = () => {
+    if (patternList[useStore.customSetting.basic.currenttab].sel == false) {
+        for (let i in patternList) {
+            if (patternList[i].sel == true) {
+                useStore.$patch((state: any) => {
+                    state.customSetting.basic.currenttab = i
+                    Defaultdisplay.value = Number(i)
+                })
+                return
+            }
+        }
+    }
+}
+
+setcurrent()
 
 const Defaultstandby = ref(0) //默认待命点
 if (!useStore.customSetting.basic.standby) {
@@ -233,48 +254,48 @@ const gochargepile = () => {
 <template>
     <div>
         <div class="set_right_top">
-            <div class="font4">常用模式</div>
+            <div class="font4">{{$t('setting.cyms')}}</div>
             <div>
                 <div class="base_one_setting" v-for="(item,index) in patternList" :key="index"
                     @click="patterTap(index)">
                     <div>
                         <img :src="item.sel?item.ico1:item.ico2" style="width:55px;height: auto;">
                     </div>
-                    <div class="font5" :style="item.sel?'color: #83A9FF;':'color: #999999;'">{{item.name}}</div>
+                    <div class="font5" :style="item.sel?'color: #83A9FF;':'color: #999999;'">{{$t(item.name)}}</div>
                 </div>
             </div>
         </div>
         <!-- 字体设置大小 -->
         <div class="one_setbox" @click="TankControl(1)">
-            <div class="setname font4">字体设置</div>
-            <div class="setdesc">设置字体大小</div>
+            <div class="setname font4">{{$t('setting.ztsz')}}</div>
+            <div class="setdesc">{{$t('setting.szztdx')}}</div>
             <div class="box_rightset font5">
                 <div style="margin-right:20px">
-                    <span v-if="fontSizetype==0">小号字体</span>
-                    <span v-if="fontSizetype==1">中号字体</span>
-                    <span v-if="fontSizetype==2">大号字体</span>
+                    <span v-if="fontSizetype==0">{{$t('setting.xhzt')}}</span>
+                    <span v-if="fontSizetype==1">{{$t('setting.zhzt')}}</span>
+                    <span v-if="fontSizetype==2">{{$t('setting.dhzt')}}</span>
                 </div>
                 <img src="../../assets/img/setting_arrow_down.png" style="width: 16px;height: 9px;">
             </div>
         </div>
         <!-- 主页显示模式 -->
         <div class="one_setbox" @click="TankControl(2)">
-            <div class="setname font4">主页模式显示</div>
-            <div class="setdesc" style='margin-left:15px'>进入车机app展示的页面</div>
+            <div class="setname font4">{{$t('setting.zymsxs')}}</div>
+            <div class="setdesc" style='margin-left:15px'>{{$t('setting.jrcjzs')}}</div>
             <div class="box_rightset font5">
                 <div style="margin-right:20px">
-                    <span v-if="Defaultdisplay==0">快捷送餐</span>
-                    <span v-if="Defaultdisplay==1">多点送餐</span>
-                    <span v-if="Defaultdisplay==2">引领</span>
-                    <span v-if="Defaultdisplay==3">巡游</span>
+                    <span v-if="Defaultdisplay==0">{{$t('index.kjsc')}}</span>
+                    <span v-if="Defaultdisplay==1">{{$t('index.ddsc')}}</span>
+                    <span v-if="Defaultdisplay==2">{{$t('index.yl')}}</span>
+                    <span v-if="Defaultdisplay==3">{{$t('index.xy')}}</span>
                 </div>
                 <img src="../../assets/img/setting_arrow_down.png" style="width: 16px;height: 9px;">
             </div>
         </div>
         <!-- 返航待命点 -->
         <div class="one_setbox" @click="TankControl(3)">
-            <div class="setname font4">返航待命点</div>
-            <div class="setdesc" style='margin-left:38px'>车机返航所返回的点位</div>
+            <div class="setname font4">{{$t('setting.fhdmd')}}</div>
+            <div class="setdesc" style='margin-left:38px'>{{$t('setting.cjfhsfhwz')}}</div>
             <div class="box_rightset font5">
                 <div style="margin-right:20px">{{standbyname}}</div>
                 <img src="../../assets/img/setting_arrow_down.png" style="width: 16px;height: 9px;">
@@ -297,8 +318,8 @@ const gochargepile = () => {
         <div class="char_sel" @click="TankControl(5)">
             <div>
                 <div class="char_top">
-                    <div class="setname font4">充电桩选择</div>
-                    <div class="setdesc" style='margin-left:13px'>选择机器人充电桩</div>
+                    <div class="setname font4">{{$t('setting.cdzxz')}}</div>
+                    <div class="setdesc" style='margin-left:13px'>{{$t('setting.xzjqrcdz')}}</div>
                     <div class="box_rightset font5" style="right:0">
                         <div style="margin-right:20px">{{charname}}</div>
                         <img src="../../assets/img/setting_arrow_down.png" style="width: 16px;height: 9px;">
@@ -306,7 +327,7 @@ const gochargepile = () => {
                 </div>
             </div>
 
-            <div @click.stop="gochargepile">回桩充电</div>
+            <div @click.stop="gochargepile">{{$t('setting.hzcd')}}</div>
         </div>
 
         <div style=" height:20px"></div>

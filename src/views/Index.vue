@@ -13,7 +13,7 @@ export default defineComponent({
         const modelList: any = reactive([
             {
                 id: 0,
-                name: '快捷送餐',
+                name: 'index.kjsc',
                 show: false,
                 sel: false,
                 img1: new URL('../assets/img/tab1sel.png', import.meta.url),
@@ -21,7 +21,7 @@ export default defineComponent({
             },
             {
                 id: 1,
-                name: '多点送餐',
+                name: 'index.ddsc',
                 show: false,
                 sel: false,
                 img1: new URL('../assets/img/tab2sel.png', import.meta.url),
@@ -29,7 +29,7 @@ export default defineComponent({
             },
             {
                 id: 2,
-                name: '引领',
+                name: 'index.yl',
                 show: false,
                 sel: false,
                 img1: new URL('../assets/img/tab3sel.png', import.meta.url),
@@ -37,7 +37,7 @@ export default defineComponent({
             },
             {
                 id: 3,
-                name: '巡游',
+                name: 'index.xy',
                 show: false,
                 sel: false,
                 img1: new URL('../assets/img/tab4sel.png', import.meta.url),
@@ -142,19 +142,19 @@ export default defineComponent({
             <div class="type_select" @click="changeType">
                 <img src="../assets/img/select.png">
                 <div>
-                    <text v-if="current_Tab == 0&&!selcte_type">快捷送餐</text>
-                    <text v-if="current_Tab == 1&&!selcte_type">多点送餐</text>
-                    <text v-if="current_Tab == 2&&!selcte_type">引领</text>
-                    <text v-if="current_Tab == 3&&!selcte_type">巡游</text>
-                    <text v-if="selcte_type">收起菜单</text>
+                    <text v-if="current_Tab == 0&&!selcte_type">{{$t('index.kjsc')}}</text>
+                    <text v-if="current_Tab == 1&&!selcte_type">{{$t('index.ddsc')}}</text>
+                    <text v-if="current_Tab == 2&&!selcte_type">{{$t('index.yl')}}</text>
+                    <text v-if="current_Tab == 3&&!selcte_type">{{$t('index.xy')}}</text>
+                    <text v-if="selcte_type">{{$t(('index.sqcd'))}}</text>
                 </div>
             </div>
 
             <div class="return_box" @click="goStandby">
                 <img src="../assets/img/dirction.png">
-                <div>返航</div>
+                <div>{{$t('index.fh')}}</div>
             </div>
-            <div class="current_local">当前机器人定位：{{CurrentF}}L</div>
+            <div class="current_local">{{$t('index.jqrdqdw')}} {{CurrentF}}L</div>
         </div>
         <router-view v-slot="{ Component }">
             <keep-alive>
@@ -170,7 +170,7 @@ export default defineComponent({
                         @click="changeTab(item.id)">
                         <img :src="current_Tab==index?item.img1:item.img2"
                             style="height: 50px;width: 50px;margin-bottom: 5px;">
-                        <div>{{item.name}}</div>
+                        <div>{{$t(item.name)}}</div>
                     </div>
 
 
@@ -178,7 +178,7 @@ export default defineComponent({
             </div>
             <div class="go_set">
                 <img src="../assets/img/index_set.png">
-                <div class="setfont" @click="gosetting">设置</div>
+                <div class="setfont" @click="gosetting">{{$t('index.sz')}}</div>
             </div>
         </div>
     </div>
