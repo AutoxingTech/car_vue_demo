@@ -158,21 +158,24 @@ const freshList = (e: any) => {
     return JSON.parse(JSON.stringify(e))
 }
 //获取楼层
+//获取楼层
 const getFloor = (e: any) => {
     let Flist = []
     let floorIndex = 0
-    for (let i of e) {
+    for (let i in e) {
         let has = false
-        Flist.forEach((item) => {
-            if (item.name == i.floor) {
+        Flist.forEach((item, index) => {
+            if (item.name == e[i].floor) {
                 has = true
             }
             //等于currentfloor设置为高亮
-            if (i.floor == currentfloor) {
-                floorIndex = i
+            if (e[i].floor == currentfloor) {
+                floorIndex = index
             }
         })
-        if (has == false) { Flist.push({ name: i.floor, sel: false }) }
+        if (has == false) {
+            Flist.push({ name: e[i].floor, sel: false })
+        }
         Flist[floorIndex].sel = true
     }
     return Flist
