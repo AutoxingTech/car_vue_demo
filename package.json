@@ -9,8 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@autoxing/robot-js-sdk": "^1.0.8",
-    "@autoxing/robot-js-sdk-dev": "^1.0.71",
+    "@autoxing/robot-js-sdk": "^1.0.14",
+    "@autoxing/robot-js-sdk-dev": "^1.0.72",
     "@vitejs/plugin-legacy": "^2.0.1",
     "amfe-flexible": "^2.2.1",
     "axios": "^0.27.2",
