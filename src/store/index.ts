@@ -15,7 +15,8 @@ const store = defineStore('Store', {
             reFresh: false,  //是否刷新
             vers: '', //车机地盘版本
             sdkVers: '',  //机器人sdk版本
-            showLogs: false
+            showLogs: false,
+            tapType: 0  //0:正常发任务跳转  1从任务中并且急停发待命点或者充电桩
 
         }
     },

@@ -5,6 +5,7 @@ import { CrashStatus } from '../js/globalData'
 import { onMounted, reactive, ref, watch } from 'vue';
 import store from '../store';
 import { onBeforeRouteLeave } from 'vue-router';
+import { Rlog } from '../js/Rlog';
 const userStore: any = store()
 const task = taskInfo
 const takeMeal = ref(false)
@@ -21,13 +22,13 @@ let getmeal_pausetime = ref(0) //取餐等待时长
 //14出发 16到达 到达状态巡游不需要暂停，临时解决 
 //sdk暂停状态 暂停无效也怕时间差寸交互不及时
 const cruisePauseAble = ref(0)
-
+const countdownSwitch = ref(true) //送餐倒计时开关
 function setCurrentTask(t: any) {
     task.currentTask = t
 }
 
 function UICallBack(tag: number) {
-    console.log("==============UICallBack==========", tag)
+    Rlog(tag, "==============UICallBack==========")
     switch (tag) {
         case 14: {//前往
             cruisePauseAble.value = 14
@@ -35,23 +36,25 @@ function UICallBack(tag: number) {
         }
             break;
         case 16: {//到达
-            console.log("到达16")
+            Rlog("到达16")
             cruisePauseAble.value = 16
             if (taskInfo.runType == 23) {
                 curiseCur.value = taskInfo.currentTask.name
-                console.log(curiseCur.value, "value")
+                Rlog(curiseCur.value, "value")
             }
 
         }
             break;
         case 40: {//到达
-            console.log("到达40")
+            Rlog("到达40")
             takeMeal.value = true
             if (taskInfo.runType == 20 || taskInfo.runType == 21 || taskInfo.runType == 22) {
                 //到达之前点击了提前取
                 getcurrentearly.value = false
                 clearTimeout(countdownTimeout)
-                TimeoutSet_getmeal(0)
+                if (countdownSwitch.value) {
+                    TimeoutSet_getmeal(0)
+                }
             }
         }
             break;
@@ -64,7 +67,6 @@ function UICallBack(tag: number) {
 }
 
 onMounted(() => {
-    console.log("onMounted")
     robotUtil.setUICallBack(UICallBack)
     currentTaskIndex = 0
     updateCurrentTaskIndex()
@@ -98,14 +100,14 @@ function updateCurrentTaskIndex() {
         }
     }
 
-    console.log("currentTaskIndex", currentTaskIndex)
+    Rlog(currentTaskIndex, "Task-currentTaskIndex")
     if (hastask == true) {
         let t = task.list[currentTaskIndex]
         setCurrentTask(t)
     }
     if (hastask == false) {
         if (taskInfo.runType == 20 || taskInfo.runType == 21 || taskInfo.runType == 22 || taskInfo.runType == 23) {
-            console.log("该去待命点了")
+            Rlog("该去待命点了")
             let t = taskInfo.backPt;
             taskInfo.runType = 24
             setCurrentTask(t)
@@ -117,7 +119,6 @@ function updateCurrentTaskIndex() {
 
 //暂停/继续
 function pause() {
-    console.log(taskInfo.runType, cruisePauseAble.value)
     clearTimeout(countdownTimeout)
     if (taskInfo.runType == 20 || taskInfo.runType == 21) {
         if (isPause.value) {
@@ -140,7 +141,7 @@ function pause() {
                     isPause.value = !isPause.value
                 })
             } else {
-                robotUtil.resumeMotion().then(() => {
+                robotUtil.resumeTask().then(() => {
                     updateCurrentTaskIndex()
                     isPause.value = !isPause.value
                 })
@@ -157,7 +158,7 @@ function pause() {
             return
         } else {
             if (cruiseStop.value) {
-                robotUtil.resumeMotion().then(() => {
+                robotUtil.resumeTask().then(() => {
                     cruiseStop.value = !cruiseStop.value
                 })
             } else {
@@ -215,7 +216,6 @@ function preGet(item: any) {
 //点击当前提前取
 function preGetCurrent() {
     clearTimeout(countdownTimeout)
-    console.log("preGetCurrent")
     robotUtil.pauseTask().then(() => {
         getcurrentearly.value = true
         TimeoutSet_getEary(0)
@@ -225,7 +225,7 @@ function preGetCurrent() {
 //取消提前取餐
 function Cancle_getEarly() {
     clearTimeout(countdownTimeout)
-    robotUtil.resumeMotion().then(() => {
+    robotUtil.resumeTask().then(() => {
         updateCurrentTaskIndex()
         getcurrentearly.value = false
     })
@@ -332,7 +332,6 @@ function TimeoutSet_Curise(e: number) {
 //到达点位开始倒计时
 function TimeoutSet_getmeal(e: number) {
     let pauseTime = userStore.customSetting.delivery.stopDuration
-    // console.log(pauseTime, "time")
     let i = e
     countdownTimeout = setTimeout(() => {
         i += 1
@@ -357,7 +356,7 @@ function ModifyTask() {
     userStore.$patch((state: any) => {
         state.isModify = true
         clearTimeout(countdownTimeout)
-        console.log("结束当前任务")
+        Rlog("结束当前任务")
         robotUtil.cancelTask()
     })
 }
@@ -365,7 +364,7 @@ function ModifyTask() {
 //继续任务
 function goonTask() {
     if (!takeMeal) {
-        robotUtil.resumeMotion()
+        robotUtil.resumeTask()
         robotUtil.continueTask()
     }
 }
@@ -373,12 +372,30 @@ function goonTask() {
 
 //离开页面
 onBeforeRouteLeave(() => {
-    console.log("离开页面清除倒计时")
+    Rlog("离开页面清除倒计时")
     clearTimeout(countdownTimeout)
     isPause.value = false
     cruiseStop.value = false
 
 })
+defineExpose({ userStore, countdownSwitch });
+</script>
+<script lang="ts">
+import { defineComponent } from 'vue';
+export default defineComponent({
+    beforeRouteEnter(to, from, next) {
+        next((vm) => {
+            const instance: any = vm;
+            //不存在倒计时开关参数 默认设置为1
+            if (instance.userStore.customSetting.delivery.countdownSwitch == undefined) {
+                instance.countdownSwitch = true
+            } else {
+                instance.countdownSwitch = instance.userStore.customSetting.delivery.countdownSwitch
+
+            }
+        });
+    },
+});
 </script>
 
 <template>
@@ -393,24 +410,28 @@ onBeforeRouteLeave(() => {
 
     <!-- 任务中画面 -->
     <div class="task_content" @click="pause" v-if="!isPause">
-        <div class="center_table" v-if="task.runType!==23">{{task.currentTask.name}}</div>
-        <div class="center_table" v-if="task.runType==23&&cruiseStop==false&&cruisePauseAble!=16">{{$t('task.xyz')}}
+        <div class="center_table" v-if="task.runType !== 23">{{ task.currentTask.name }}</div>
+        <div class="center_table" v-if="task.runType == 23 && cruiseStop == false && cruisePauseAble != 16">{{
+                $t('task.xyz')
+        }}
         </div>
 
-        <div class="center_table" v-if="task.runType==23&&cruiseStop==false&&cruisePauseAble==16">
-            {{task.currentTask.name}}
+        <div class="center_table" v-if="task.runType == 23 && cruiseStop == false && cruisePauseAble == 16">
+            {{ task.currentTask.name }}
         </div>
         <!-- 巡游已暂停 -->
-        <div class="center_table" v-if="task.runType==23&&cruiseStop==true">{{$t('task.xyyzt')}}</div>
+        <div class="center_table" v-if="task.runType == 23 && cruiseStop == true">{{ $t('task.xyyzt') }}</div>
 
-        <div v-if="task.runType==20||task.runType==21" class="center_give">{{$t('task.scz')}}</div>
-        <div v-if="task.runType==23&&cruiseStop==false&&cruisePauseAble==16" class="center_give">{{$t('task.xyydd')}}
+        <div v-if="task.runType == 20 || task.runType == 21" class="center_give">{{ $t('task.scz') }}</div>
+        <div v-if="task.runType == 23 && cruiseStop == false && cruisePauseAble == 16" class="center_give">{{
+                $t('task.xyydd')
+        }}
         </div>
 
-        <div v-if="task.runType==23&&cruiseStop==true" class="center_give" style="bottom:140px">
-            <div>{{$t('task.ztxyrwz')}}</div>
-            <div>{{$t('task.djpmjxxy')}}</div>
-            <div style="color: #ED8037;">{{$t('task.dsjsz')}} ({{curise_pausetime}}s)</div>
+        <div v-if="task.runType == 23 && cruiseStop == true" class="center_give" style="bottom:140px">
+            <div>{{ $t('task.ztxyrwz') }}</div>
+            <div>{{ $t('task.djpmjxxy') }}</div>
+            <div style="color: #ED8037;">{{ $t('task.dsjsz') }} ({{ curise_pausetime }}s)</div>
         </div>
 
         <img src="../assets/img/taskcircle.png" style="height: 100%;width: 100%;position: absolute;">
@@ -421,35 +442,37 @@ onBeforeRouteLeave(() => {
     <div class="stop_now" @click="navCrashstop" v-if="!isPause">
         <!-- 急停 -->
         <img src="../assets/img/stoppress.jpg">
+        <div class="la_font">{{ $t('task.jtms') }}</div>
     </div>
-    <div class="ealy_get" @click="preGetCurrent()" v-if="!isPause&&(task.runType==20||task.runType==21)">
+    <div class="ealy_get" @click="preGetCurrent()" v-if="!isPause && (task.runType == 20 || task.runType == 21)">
         <!-- 提前取 -->
         <img src="../assets/img/earyget.jpg" />
+        <div class="la_font">{{ $t('task.tqq') }}</div>
     </div>
 
 
-    <div class="curise_mode" v-if="task.runType==23&&cruiseStop==true">
+    <div class="curise_mode" v-if="task.runType == 23 && cruiseStop == true">
         <div class="mode_right" @click="cancelTask">
             <div>
                 <img src="../assets/img/taskr2.png" style="width:100%;height: 100%;">
             </div>
-            <div class="font8">{{$t('task.jsrw')}}</div>
+            <div class="font8">{{ $t('task.jsrw') }}</div>
         </div>
     </div>
 
     <!-- //提前取餐的弹框 -->
-    <div class="early_gettank" v-if="getcurrentearly==true">
+    <div class="early_gettank" v-if="getcurrentearly == true">
         <div class="earlycenter">
             <div class="imgcenter">
                 <img src="../assets/img/eary_getmeal.png" style="width:100%;height: 100%;">
             </div>
             <div class="overtime">
-                {{$t('task.sfwccz')}}
+                {{ $t('task.sfwccz') }}
             </div>
 
             <div class="bot-button">
-                <div @click="Cancle_getEarly">{{$t('index.qx')}}</div>
-                <div @click="getEarly">{{$t('task.wc')}} （{{getearly_pausetime}}s）</div>
+                <div @click="Cancle_getEarly">{{ $t('index.qx') }}</div>
+                <div @click="getEarly">{{ $t('task.wc') }} （{{ getearly_pausetime }}s）</div>
             </div>
         </div>
     </div>
@@ -461,11 +484,11 @@ onBeforeRouteLeave(() => {
         <div class="stopsty">
             <div class="leftdevery" @click="pause">
                 <div class="annicont">
-                    <div class="ondeliveryable">{{task.currentTask.name}}</div>
-                    <div v-if="task.runType==20||task.runType==21" class="deliverytip font9">
-                        <div>{{$t('task.ztrwz')}}</div>
-                        <div>{{$t('task.djpmjxps')}}</div>
-                        <div>{{$t('task.dsjsz')}} ({{pauseshowtime}}s)</div>
+                    <div class="ondeliveryable">{{ task.currentTask.name }}</div>
+                    <div v-if="task.runType == 20 || task.runType == 21" class="deliverytip font9">
+                        <div>{{ $t('task.ztrwz') }}</div>
+                        <div>{{ $t('task.djpmjxps') }}</div>
+                        <div>{{ $t('task.dsjsz') }} ({{ pauseshowtime }}s)</div>
                     </div>
                     <img src="../assets/img/taskcircle.png" style="height: 100%;width: 100%;position: absolute;">
                     <img src="../assets/img/taskcircle2.png"
@@ -474,23 +497,24 @@ onBeforeRouteLeave(() => {
             </div>
             <div class="rightdevery">
                 <div class="delivery_list">
-                    <div class="topmess">{{$t('task.rwlb')}} <div class="emptyline"></div>
+                    <div class="topmess">{{ $t('task.rwlb') }} <div class="emptyline"></div>
                         <div class="list_scroll">
-                            <div class="one_li" v-for="(item,index) in task.pallet">
-                                <div class="lineem" v-if="index!=task.pallet.length-1">
+                            <div class="one_li" v-for="(item, index) in task.pallet">
+                                <div class="lineem" v-if="index != task.pallet.length - 1">
                                     <div></div>
                                 </div>
                                 <div class="li_cont">
-                                    <div :class="item.status==1?'one_num2':'one_num'">{{index+1}}</div>
+                                    <div :class="item.status == 1 ? 'one_num2' : 'one_num'">{{ index + 1 }}</div>
                                     <div class="one_cont"
-                                        :style="'border-bottom: 4px solid '+getcolor(item.status)+'!important'">
-                                        <div :style="'color:'+getcolor(item.status)+''">L{{index+1}}：</div>
-                                        <div :style="'color:'+getcolor(item.status)+''" class="font8">{{item.name}}
+                                        :style="'border-bottom: 4px solid ' + getcolor(item.status) + '!important'">
+                                        <div :style="'color:' + getcolor(item.status) + ''">L{{ index + 1 }}：</div>
+                                        <div :style="'color:' + getcolor(item.status) + ''" class="font8">{{ item.name
+                                        }}
                                         </div>
                                     </div>
                                 </div>
                                 <div @click="preGet(item)" class="bottom_Co font8"
-                                    v-if="item.status==0||item.status==1">{{$t('task.tqq')}}
+                                    v-if="item.status == 0 || item.status == 1">{{ $t('task.tqq') }}
                                 </div>
                             </div>
                         </div>
@@ -500,11 +524,11 @@ onBeforeRouteLeave(() => {
                 <div class="delivery_bottom">
                     <div class="bottom1 font8" @click="ModifyTask">
                         <img src="../assets/img/taskr1.png" alt="">
-                        {{$t('index.xgrw')}}
+                        {{ $t('index.xgrw') }}
                     </div>
                     <div class="bottom2 font8" @click="cancelTask">
                         <img src="../assets/img/taskr2.png" alt="">
-                        {{$t('task.jsrw')}}
+                        {{ $t('task.jsrw') }}
                     </div>
                 </div>
             </div>
@@ -517,44 +541,44 @@ onBeforeRouteLeave(() => {
     <!-- 取餐画面 -->
     <div class="Take_meal" v-if="takeMeal">
         <!-- 多餐桌 -->
-        <div class="take_cont" v-if="task.list.length>1">
-            <div :class="getTakeMelcalss(item.status)" v-for="(item,index) in task.list" :key="index">
+        <div class="take_cont" v-if="task.list.length > 1">
+            <div :class="getTakeMelcalss(item.status)" v-for="(item, index) in task.list" :key="index">
                 <div>
-                    {{item.name}}
+                    {{ item.name }}
                 </div>
-                <div v-if="task.runType==20">
-                    <span v-for="(item2,index2) in item.idx" :key="index2">
-                        {{item2+1}}{{$t('task.ceng')}}<span v-if="index2!=item.idx.length - 1">、</span>
-                    </span>{{$t('task.tuopan')}}
+                <div v-if="task.runType == 20">
+                    <span v-for="(item2, index2) in item.idx" :key="index2">
+                        {{ item2 + 1 }}{{ $t('task.ceng') }}<span v-if="index2 != item.idx.length - 1">、</span>
+                    </span>{{ $t('task.tuopan') }}
                 </div>
-                <div class="taketype" @click="takeAway(item)" v-if="item.status==2">
-                    <div>{{$t('task.liji')}}</div>
-                    <div>{{$t('task.quchu')}}</div>
+                <div class="taketype" @click="takeAway(item)" v-if="item.status == 2">
+                    <div>{{ $t('task.liji') }}</div>
+                    <div>{{ $t('task.quchu') }}</div>
                 </div>
 
-                <div class="taketype2" v-if="item.status==3">
-                    <div>{{$t('task.yqc')}}</div>
+                <div class="taketype2" v-if="item.status == 3">
+                    <div>{{ $t('task.yqc') }}</div>
                 </div>
-                <div class="taketype3" @click="preGet(item)" v-if="item.status==1||item.status==0">
-                    <div>{{$t('task.tiqian')}}</div>
-                    <div>{{$t('task.quchu')}}</div>
+                <div class="taketype3" @click="preGet(item)" v-if="item.status == 1 || item.status == 0">
+                    <div>{{ $t('task.tiqian') }}</div>
+                    <div>{{ $t('task.quchu') }}</div>
                 </div>
             </div>
-            <div class="interview">
-                {{$t('task.lkjsz')}}({{getmeal_pausetime}}s)
+            <div class="interview" v-if="countdownSwitch">
+                {{ $t('task.lkjsz') }}({{ getmeal_pausetime }}s)
             </div>
         </div>
 
         <!-- 单餐桌 -->
-        <div v-if="task.list.length==1" class="take_cont2">
+        <div v-if="task.list.length == 1" class="take_cont2">
             <div class="onetasktake">
-                <div>{{task.currentTask.name}}</div>
-                <div>{{$t('task.qqc')}}</div>
+                <div>{{ task.currentTask.name }}</div>
+                <div>{{ $t('task.qqc') }}</div>
             </div>
-            <div @click="takeAway(task.currentTask)" class="onepallent_take">{{$t('task.ljqc')}}</div>
+            <div @click="takeAway(task.currentTask)" class="onepallent_take">{{ $t('task.ljqc') }}</div>
 
-            <div class="interview">
-                {{$t('task.lkjsz')}}({{getmeal_pausetime}}s)
+            <div class="interview" v-if="countdownSwitch">
+                {{ $t('task.lkjsz') }}({{ getmeal_pausetime }}s)
             </div>
         </div>
 
@@ -618,6 +642,18 @@ onBeforeRouteLeave(() => {
     position: fixed;
     right: 20px;
     bottom: 25px;
+}
+
+.la_font {
+    width: 100%;
+    text-align: center;
+    font-size: 22px;
+    color: white;
+    position: absolute;
+    bottom: 55px;
+    font-weight: bold;
+    height: 32px;
+
 }
 
 .center_table {
@@ -1041,8 +1077,10 @@ onBeforeRouteLeave(() => {
 }
 
 .taketype {
-    width: 126px;
+    min-width: 126px;
     height: 141px;
+    padding: 0 10px;
+    box-sizing: border-box;
     position: absolute;
     right: 13px;
     top: 12px;
@@ -1059,8 +1097,12 @@ onBeforeRouteLeave(() => {
 }
 
 .taketype2 {
-    width: 126px;
+    min-width: 126px;
+    max-width: 150px;
+    text-align: center;
     height: 141px;
+    padding: 0 10px;
+    box-sizing: border-box;
     position: absolute;
     right: 13px;
     top: 12px;
@@ -1076,8 +1118,10 @@ onBeforeRouteLeave(() => {
 }
 
 .taketype3 {
-    width: 126px;
+    min-width: 126px;
     height: 141px;
+    padding: 0 10px;
+    box-sizing: border-box;
     position: absolute;
     right: 13px;
     top: 12px;
@@ -1245,10 +1289,10 @@ onBeforeRouteLeave(() => {
 }
 
 .interview {
-    width: 200px;
+    width: 100%;
+    text-align: center;
+    padding: 0 10px;
     position: absolute;
-    left: 50%;
-    margin-left: -100px;
     bottom: 20px;
     font-size: 20px;
     font-family: Microsoft YaHei;

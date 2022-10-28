@@ -5,29 +5,36 @@ import { robotUtil } from '../js/robotUtil';
 import settingUtil from '../js/settingUtil';
 import router from '../router';
 import store from '../store';
+import { Rlog } from '../js/Rlog';
 export default defineComponent({
     setup() {
+        const useStore = store()
         let obj = reactive({
             frompath: '',
         })
 
         function goon() {
-            console.log("goon")
+            Rlog("急停后点击继续任务")
             CrashStatus.value = 1
-            robotUtil.cancelEmergencyStop().then(() => {
-
-            })
+            if (robotUtil.isTasking()) {
+                robotUtil.restartTask().then(() => {
+                    robotUtil.cancelEmergencyStop()
+                })
+            } else {
+                robotUtil.cancelEmergencyStop()
+            }
         }
 
         function gostay() {
-            console.log("gostay")
+            Rlog("急停后点击原地待命")
             CrashStatus.value = 2
             if (obj.frompath == '/task') {
                 robotUtil.cancelTask().then(() => {
                     robotUtil.cancelEmergencyStop().then((res: any) => {
-                        if(router.currentRoute.value.path=="/crashstop"){
+                        if (router.currentRoute.value.path == "/crashstop") {
                             router.go(-2)
-                        }else{
+                            settingUtil.audioStop()
+                        } else {
                             router.go(-1)
                         }
                     })
@@ -42,6 +49,12 @@ export default defineComponent({
 
         function gochar() {
             CrashStatus.value = 3
+            //从任务页面急停 发任务就返回而不是push（task）
+            if (obj.frompath == '/task') {  //标记为1
+                useStore.$patch((state: any) => {
+                    state.tapType = 1
+                })
+            }
             robotUtil.cancelEmergencyStop().then((res: any) => {
                 settingUtil.goCharpile(settingUtil.getChargeStation())
             })
@@ -49,6 +62,11 @@ export default defineComponent({
 
         function goit() {
             CrashStatus.value = 4
+            if (obj.frompath == '/task') {  //标记为1
+                useStore.$patch((state: any) => {
+                    state.tapType = 1
+                })
+            }
             robotUtil.cancelEmergencyStop().then((res: any) => {
                 settingUtil.goStandby(settingUtil.getStandbyStation())
             })
@@ -74,10 +92,10 @@ export default defineComponent({
     <div class="float3"></div>
     <div class="tip"></div>
     <div class="crash_tip">
-        <div class="tip1">{{$t('crash.nyax')}}</div>
-        <div class="tip2">{{$t('crash.jtan')}}</div>
+        <div class="tip1">{{ $t('crash.nyax') }}</div>
+        <div class="tip2">{{ $t('crash.jtan') }}</div>
     </div>
-    <div class="tip3">可以自由推行机器人{{$t('crash.kyzytxjqr')}}</div>
+    <div class="tip3">{{ $t('crash.kyzytxjqr') }}</div>
     <div class="crash_center">
         <div class="enter_logo">
             <div class="logo_center">
@@ -85,25 +103,25 @@ export default defineComponent({
             </div>
         </div>
         <div class="crash_choice" @click="goon" style="box-shadow: 0 0px 40px 0px #83A9FF;">
-            <div class="li1">{{$t('crash.jxrw')}}</div>
+            <div class="li1">{{ $t('crash.jxrw') }}</div>
             <div class="taskonimg">
                 <img src="../assets/img/crashstopic1.png" style="width:100%;height: 100%;">
             </div>
         </div>
         <div class="crash_choice" @click="gochar">
-            <div class="li2">{{$t('crash.fhcs')}}</div>
+            <div class="li2">{{ $t('crash.fhcs') }}</div>
             <div class="taskonimg2">
                 <img src="../assets/img/crashico2.png" style="width:100%;height: 100%;">
             </div>
         </div>
         <div class="crash_choice" @click="gostay">
-            <div class="li3">{{$t('crash.yddm')}}</div>
+            <div class="li3">{{ $t('crash.yddm') }}</div>
             <div class="taskonimg">
                 <img src="../assets/img/crashico3.png" style="width:100%;height: 100%;">
             </div>
         </div>
         <div class="crash_choice" @click="goit">
-            <div class="li4">{{$t('crash.fhdmd')}}</div>
+            <div class="li4">{{ $t('crash.fhdmd') }}</div>
             <div class="taskonimg2">
                 <img src="../assets/img/crashico4.png" style="width:100%;height: 100%;">
             </div>

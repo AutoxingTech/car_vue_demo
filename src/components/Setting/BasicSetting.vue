@@ -1,18 +1,35 @@
 
+<script lang="ts">
+import { defineComponent, nextTick } from 'vue';
+export default defineComponent({
+    beforeRouteEnter(to, from, next) {
+        next((vm) => {
+            const instance: any = vm;
+            instance.setstand()
+        })
+    }
+});
+</script>
 <script setup lang="ts">
-import { onMounted, onUnmounted, reactive, ref } from 'vue';
+import { reactive, ref, watch } from 'vue';
 import store from "../../store";
 import BaseSettingtank from './component/BaseSettingtank.vue';
-import { StandbyPoint, ChargingPile } from '../../js/Datacollation'
-import { robotUtil } from '../../js/robotUtil';
+import { standbyPoint, chargingPile } from '../../js/Datacollation'
 import settingUtil from '../../js/settingUtil';
+import { updateMap } from '../../js/globalData';
+
 const useStore: any = store()
-let pointList: any = reactive({
-    StandbyPointList: [...StandbyPoint, ...ChargingPile],
-    ChargingPileList: [...ChargingPile]
-})
-//当前模式列表
-const patternList: any = reactive([
+const standbyPointList: any = standbyPoint  //待命点列表
+const chargingPileList: any = chargingPile  //充电桩
+const controlType = ref(0)  //控制弹框相应显示内容
+const fontSizetype = ref(0) //当前字号大小 0 小号  1中号 2大号
+const defaultdisplay = ref(0) //默认展示tab的下标
+const defaultstandby = ref(0) //默认待命点
+const defaultcharplie = ref(0) //默认充电桩
+const charname = ref() //充电桩name
+const standbyname = ref() //待命点name
+const guideplaytype = ref(0) //引领默认播放
+const patternList: any = reactive([ //主页显示模式列表
     {
         name: 'index.kjsc',
         ico1: new URL('../../assets/img/selbase1.png', import.meta.url),
@@ -38,16 +55,46 @@ const patternList: any = reactive([
         sel: false
     }
 ])
-if (!useStore.customSetting.basic.model) {
-    useStore.$patch((state: any) => {
-        state.customSetting.basic.model = [0, 1, 2, 3]
-    })
-}
-for (let i of useStore.customSetting.basic.model) {
-    patternList[i].sel = true
+const baseset: any = ref(null)
+
+//初始化基础设置basesetting及服务器设置内缺
+function initbaseSetting() {
+    //如果机器设置内不存在mode 赋默认都显示
+    if (!useStore.customSetting.basic.model) {
+        useStore.$patch((state: any) => {
+            state.customSetting.basic.model = [0, 1, 2, 3]
+        })
+    }
+    for (let i of useStore.customSetting.basic.model) {  //将设置内存在的mode设置为高亮显示模式
+        patternList[i].sel = true
+    }
+    //如果机器设置内不存在fontsize 赋默认值0 小号字体
+    if (!useStore.customSetting.basic.fontSize || (useStore.customSetting.basic.fontSize != 0 && useStore.customSetting.basic.fontSize != 1 && useStore.customSetting.basic.fontSize != 2)) {
+        fontSizetype.value = 0
+        useStore.$patch((state: any) => {
+            state.customSetting.basic.fontSize = 0
+        })
+    } else {
+        fontSizetype.value = useStore.customSetting.basic.fontSize
+    }
+
+    //如果机器设置内不存在默认显示模式的下标 赋默认显示快捷送餐
+    if (!useStore.customSetting.basic.currenttab) {
+        defaultdisplay.value = 0
+        useStore.$patch((state: any) => {
+            state.customSetting.basic.currenttab = 0
+        })
+    } else {
+        defaultdisplay.value = useStore.customSetting.basic.currenttab
+    }
+
+    //设置为当前现实的模式下标 不存在设置第一个
+    setcurrent()
+    //设置充电桩和待命点
+    setstand()
 }
 //更换常用模式选择
-const patterTap = (index: number) => {
+function patterTap(index: number) {
     useStore.$patch((state: any) => {
         if (state.customSetting.basic.model.indexOf(index) > -1) {
             if (state.customSetting.basic.model.length == 1) {
@@ -68,24 +115,14 @@ const patterTap = (index: number) => {
 
 }
 
-const fontSizetype = ref(0) //当前字号大小 0 小号  1中号 2大号
-if (!useStore.customSetting.basic.fontSize || (useStore.customSetting.basic.fontSize != 0 && useStore.customSetting.basic.fontSize != 1 && useStore.customSetting.basic.fontSize != 2)) {
-    fontSizetype.value = 0
-    useStore.$patch((state: any) => {
-        state.customSetting.basic.fontSize = 0
-    })
-} else {
-    fontSizetype.value = useStore.customSetting.basic.fontSize
-}
-
-
-const controlType = ref(0)  //控制选择器选择
-
-const TankControl = (e: number) => {
+function TankControl(e: number) {
     controlType.value = e
+    if (e == 3 || e == 5) {
+        baseset.value.setcur()
+    }
 }
 //修改字体
-const Changefont = (e: number) => {
+function Changefont(e: number) {
     const type: number = e
     const button = document.getElementById('app') as HTMLButtonElement;
     button.setAttribute("class", `theme_${type}`);
@@ -95,102 +132,85 @@ const Changefont = (e: number) => {
     })
     controlType.value = 0
 }
-
-
-
-const Defaultdisplay = ref(0) //默认展示tab的下标
-if (!useStore.customSetting.basic.currenttab) {
-    Defaultdisplay.value = 0
-    useStore.$patch((state: any) => {
-        state.customSetting.basic.currenttab = 0
-    })
-} else {
-    Defaultdisplay.value = useStore.customSetting.basic.currenttab
-}
-
-
-const setcurrent = () => {
+//设置当前默认显示的模式下标
+function setcurrent() {
     if (patternList[useStore.customSetting.basic.currenttab].sel == false) {
         for (let i in patternList) {
             if (patternList[i].sel == true) {
                 useStore.$patch((state: any) => {
                     state.customSetting.basic.currenttab = i
-                    Defaultdisplay.value = Number(i)
+                    defaultdisplay.value = Number(i)
                 })
                 return
             }
         }
     }
 }
-
-setcurrent()
-
-const Defaultstandby = ref(0) //默认待命点
-if (!useStore.customSetting.basic.standby) {
-    Defaultstandby.value = pointList.StandbyPointList[0].id
-    useStore.$patch((state: any) => {
-        state.customSetting.basic.standby = pointList.StandbyPointList[0].id
-    })
-} else {
-    Defaultstandby.value = useStore.customSetting.basic.standby
-}
-const standbyname = ref()
-for (var i of pointList.StandbyPointList) {
-    if (i.id == useStore.customSetting.basic.standby) {
-        standbyname.value = i.name
-        break
+//设置 充电桩和待命点（不存在 及 存在areaid但是不存在站点的处理）
+function setstand() {
+    defaultstandby.value = 0
+    defaultcharplie.value = 0
+    charname.value = ''
+    standbyname.value = ''
+    if (!useStore.customSetting.basic.standby) {
+        defaultstandby.value = standbyPointList.value[0].id
+        useStore.$patch((state: any) => {
+            state.customSetting.basic.standby = standbyPointList.value[0].id
+        })
+    } else {
+        defaultstandby.value = useStore.customSetting.basic.standby
     }
-}
-//设置里的站点如果不存在
-if (!standbyname.value) {
-    Defaultstandby.value = pointList.StandbyPointList[0].id
-    useStore.$patch((state: any) => {
-        state.customSetting.basic.standby = pointList.StandbyPointList[0].id
-    })
-    standbyname.value = pointList.StandbyPointList[0].name
-}
-
-
-const Defaultcharplie = ref(0) //默认充电桩
-if (!useStore.customSetting.basic.char) {
-    Defaultcharplie.value = pointList.ChargingPileList[0].id
-    useStore.$patch((state: any) => {
-        state.customSetting.basic.char = pointList.ChargingPileList[0].id
-    })
-} else {
-    Defaultcharplie.value = useStore.customSetting.basic.char
-}
-const charname = ref()
-for (var i of pointList.ChargingPileList) {
-    if (i.id == useStore.customSetting.basic.char) {
-        charname.value = i.name
-        break
+    for (var i of standbyPointList.value) {
+        if (i.id == useStore.customSetting.basic.standby) {
+            standbyname.value = i.name
+            break
+        }
     }
-}
+    //设置里的站点如果不存在
+    if (!standbyname.value) {
+        defaultstandby.value = standbyPointList.value[0].id
+        useStore.$patch((state: any) => {
+            state.customSetting.basic.standby = standbyPointList.value[0].id
+        })
+        standbyname.value = standbyPointList.value[0].name
+    }
 
-//设置里的站点如果不存在
-if (!charname.value) {
-    Defaultcharplie.value = pointList.ChargingPileList[0].id
-    useStore.$patch((state: any) => {
-        state.customSetting.basic.char = pointList.ChargingPileList[0].id
-    })
-    charname.value = pointList.ChargingPileList[0].name
-}
 
+    if (!useStore.customSetting.basic.char) {
+        defaultcharplie.value = chargingPileList.value[0].id
+        useStore.$patch((state: any) => {
+            state.customSetting.basic.char = chargingPileList.value[0].id
+        })
+    } else {
+        defaultcharplie.value = useStore.customSetting.basic.char
+    }
+    for (var i of chargingPileList.value) {
+        if (i.id == useStore.customSetting.basic.char) {
+            charname.value = i.name
+            break
+        }
+    }
+
+    //设置里的站点如果不存在
+    if (!charname.value) {
+        defaultcharplie.value = chargingPileList.value[0].id
+        useStore.$patch((state: any) => {
+            state.customSetting.basic.char = chargingPileList.value[0].id
+        })
+        charname.value = chargingPileList.value[0].name
+    }
+
+}
 
 //修改默认tab
-const Changtab = (e: number) => {
+function Changtab(e: number) {
     const type: number = e
     useStore.$patch((state: any) => {
         state.customSetting.basic.currenttab = type
-        Defaultdisplay.value = type
+        defaultdisplay.value = type
     })
     controlType.value = 0
 }
-
-
-
-const guideplaytype = ref(0) //引领默认播放
 
 // if (!useStore.customSetting.basic.guideplaytype) {
 //     guideplaytype.value = 0
@@ -202,7 +222,7 @@ const guideplaytype = ref(0) //引领默认播放
 // }
 
 //修改引领默认展示
-const Changeguide = (e: number) => {
+function Changeguide(e: number) {
     const type: number = e
     useStore.$patch((state: any) => {
         state.customSetting.basic.guideplaytype = type
@@ -210,16 +230,14 @@ const Changeguide = (e: number) => {
     })
     controlType.value = 0
 }
-
 //修改待命点
-const ChangeStand = (e: number) => {
-    console.log(e)
+function ChangeStand(e: number) {
     const type: number = e
     useStore.$patch((state: any) => {
         state.customSetting.basic.standby = type
-        Defaultstandby.value = type
+        defaultstandby.value = type
     })
-    for (var i of pointList.StandbyPointList) {
+    for (var i of standbyPointList.value) {
         if (i.id == useStore.customSetting.basic.standby) {
             standbyname.value = i.name
             break
@@ -228,14 +246,13 @@ const ChangeStand = (e: number) => {
     controlType.value = 0
 }
 //修改充电桩
-
-const ChangeChar = (e: number) => {
+function ChangeChar(e: number) {
     const type: number = e
     useStore.$patch((state: any) => {
         state.customSetting.basic.char = type
-        Defaultcharplie.value = type
+        defaultcharplie.value = type
     })
-    for (var i of pointList.ChargingPileList) {
+    for (var i of chargingPileList.value) {
         if (i.id == useStore.customSetting.basic.char) {
             charname.value = i.name
             break
@@ -243,61 +260,66 @@ const ChangeChar = (e: number) => {
     }
     controlType.value = 0
 }
-
 //回充电桩
-const gochargepile = () => {
+function gochargepile() {
     settingUtil.goCharpile(settingUtil.getChargeStation())
 }
-
-
+//初始化
+initbaseSetting()
+// 监听是否更新地图
+watch(() => updateMap.value, (newvalue: any, oldvalue: any) => {
+    setstand()
+})
+defineExpose({ setstand });
 </script>
 <template>
     <div>
         <div class="set_right_top">
-            <div class="font4">{{$t('setting.cyms')}}</div>
+            <div class="font4">{{ $t('setting.cyms') }}</div>
             <div>
-                <div class="base_one_setting" v-for="(item,index) in patternList" :key="index"
+                <div class="base_one_setting" v-for="(item, index) in patternList" :key="index"
                     @click="patterTap(index)">
                     <div>
-                        <img :src="item.sel?item.ico1:item.ico2" style="width:55px;height: auto;">
+                        <img :src="item.sel ? item.ico1 : item.ico2" style="width:55px;height: auto;">
                     </div>
-                    <div class="font5" :style="item.sel?'color: #83A9FF;':'color: #999999;'">{{$t(item.name)}}</div>
+                    <div class="font5" :style="item.sel ? 'color: #83A9FF;' : 'color: #999999;'">{{ $t(item.name) }}
+                    </div>
                 </div>
             </div>
         </div>
         <!-- 字体设置大小 -->
         <div class="one_setbox" @click="TankControl(1)">
-            <div class="setname font4">{{$t('setting.ztsz')}}</div>
-            <div class="setdesc">{{$t('setting.szztdx')}}</div>
+            <div class="setname font4">{{ $t('setting.ztsz') }}</div>
+            <div class="setdesc">{{ $t('setting.szztdx') }}</div>
             <div class="box_rightset font5">
                 <div style="margin-right:20px">
-                    <span v-if="fontSizetype==0">{{$t('setting.xhzt')}}</span>
-                    <span v-if="fontSizetype==1">{{$t('setting.zhzt')}}</span>
-                    <span v-if="fontSizetype==2">{{$t('setting.dhzt')}}</span>
+                    <span v-if="fontSizetype == 0">{{ $t('setting.xhzt') }}</span>
+                    <span v-if="fontSizetype == 1">{{ $t('setting.zhzt') }}</span>
+                    <span v-if="fontSizetype == 2">{{ $t('setting.dhzt') }}</span>
                 </div>
                 <img src="../../assets/img/setting_arrow_down.png" style="width: 16px;height: 9px;">
             </div>
         </div>
         <!-- 主页显示模式 -->
         <div class="one_setbox" @click="TankControl(2)">
-            <div class="setname font4">{{$t('setting.zymsxs')}}</div>
-            <div class="setdesc" style='margin-left:15px'>{{$t('setting.jrcjzs')}}</div>
+            <div class="setname font4">{{ $t('setting.zymsxs') }}</div>
+            <div class="setdesc" style='margin-left:15px'>{{ $t('setting.jrcjzs') }}</div>
             <div class="box_rightset font5">
                 <div style="margin-right:20px">
-                    <span v-if="Defaultdisplay==0">{{$t('index.kjsc')}}</span>
-                    <span v-if="Defaultdisplay==1">{{$t('index.ddsc')}}</span>
-                    <span v-if="Defaultdisplay==2">{{$t('index.yl')}}</span>
-                    <span v-if="Defaultdisplay==3">{{$t('index.xy')}}</span>
+                    <span v-if="defaultdisplay == 0">{{ $t('index.kjsc') }}</span>
+                    <span v-if="defaultdisplay == 1">{{ $t('index.ddsc') }}</span>
+                    <span v-if="defaultdisplay == 2">{{ $t('index.yl') }}</span>
+                    <span v-if="defaultdisplay == 3">{{ $t('index.xy') }}</span>
                 </div>
                 <img src="../../assets/img/setting_arrow_down.png" style="width: 16px;height: 9px;">
             </div>
         </div>
         <!-- 返航待命点 -->
         <div class="one_setbox" @click="TankControl(3)">
-            <div class="setname font4">{{$t('setting.fhdmd')}}</div>
-            <div class="setdesc" style='margin-left:38px'>{{$t('setting.cjfhsfhwz')}}</div>
+            <div class="setname font4">{{ $t('setting.fhdmd') }}</div>
+            <div class="setdesc" style='margin-left:38px'>{{ $t('setting.cjfhsfhwz') }}</div>
             <div class="box_rightset font5">
-                <div style="margin-right:20px">{{standbyname}}</div>
+                <div style="margin-right:20px">{{ standbyname }}</div>
                 <img src="../../assets/img/setting_arrow_down.png" style="width: 16px;height: 9px;">
             </div>
         </div>
@@ -318,26 +340,25 @@ const gochargepile = () => {
         <div class="char_sel" @click="TankControl(5)">
             <div>
                 <div class="char_top">
-                    <div class="setname font4">{{$t('setting.cdzxz')}}</div>
-                    <div class="setdesc" style='margin-left:13px'>{{$t('setting.xzjqrcdz')}}</div>
+                    <div class="setname font4">{{ $t('setting.cdzxz') }}</div>
+                    <div class="setdesc" style='margin-left:13px'>{{ $t('setting.xzjqrcdz') }}</div>
                     <div class="box_rightset font5" style="right:0">
-                        <div style="margin-right:20px">{{charname}}</div>
+                        <div style="margin-right:20px">{{ charname }}</div>
                         <img src="../../assets/img/setting_arrow_down.png" style="width: 16px;height: 9px;">
                     </div>
                 </div>
             </div>
 
-            <div @click.stop="gochargepile">{{$t('setting.hzcd')}}</div>
+            <div @click.stop="gochargepile">{{ $t('setting.hzcd') }}</div>
         </div>
 
         <div style=" height:20px"></div>
 
-        <BaseSettingtank :controlType="controlType" :fontSizetype="fontSizetype" :patternList="patternList"
-            :Defaultdisplay="Defaultdisplay" :StandbyPointList="pointList.StandbyPointList"
-            :ChargingPileList="pointList.ChargingPileList" :Defaultcharplie="Defaultcharplie"
-            :Defaultstandby="Defaultstandby" @TankControl="TankControl" @change-font="Changefont"
-            @change-guide="Changeguide" :guideplaytype="guideplaytype" @change-tab="Changtab"
-            @change-stand="ChangeStand" @change-char="ChangeChar">
+        <BaseSettingtank ref="baseset" :controlType="controlType" :fontSizetype="fontSizetype"
+            :patternList="patternList" :Defaultdisplay="defaultdisplay" :StandbyPointList="standbyPointList"
+            :ChargingPileList="chargingPileList" :Defaultcharplie="defaultcharplie" :Defaultstandby="defaultstandby"
+            @TankControl="TankControl" @change-font="Changefont" @change-guide="Changeguide"
+            :guideplaytype="guideplaytype" @change-tab="Changtab" @change-stand="ChangeStand" @change-char="ChangeChar">
         </BaseSettingtank>
 
     </div>
@@ -445,7 +466,7 @@ const gochargepile = () => {
 }
 
 .char_sel>div:nth-child(2) {
-    width: 873px;
+    width: 100%;
     height: 58px;
     background: #83A9FF;
     border-radius: 13px;

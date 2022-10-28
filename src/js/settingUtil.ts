@@ -1,10 +1,11 @@
 import { robotUtil } from './robotUtil'
-import { StandbyPoint, ChargingPile, songlist } from '../js/Datacollation'
+import { standbyPoint, chargingPile, songlist } from '../js/Datacollation'
 import store from '../store'
 import { useLoading } from 'vue3-loading-overlay';
-import { webRefresh, app } from './android'
+import { webRefresh, app, audioJsPlay, audioJsStop } from './android'
 import router from '../router';
 import { ActionType } from "../js/globalConfig"
+import { getLocale } from '../main'
 export const Loading = useLoading()
 export const ControlLoading = (e: boolean) => {
     if (e) {
@@ -44,11 +45,10 @@ export default {
     setPos: (item: any) => {
         return robotUtil.resetPose({ x: item.coordinate[0], y: item.coordinate[1], yaw: item.yaw, areaId: item.areaId })
     },
-
     //返航 取待命点
     getStandbyStation: () => {
         const useStore: any = store()
-        let returnPoin: any = [...StandbyPoint, ...ChargingPile]
+        let returnPoin: any = standbyPoint.value
         let station: any
         if (!useStore.customSetting.basic.standby || useStore.customSetting.basic.standby == "") {
             station = returnPoin[0]
@@ -66,11 +66,10 @@ export default {
 
         return station
     },
-
     //取充电桩
     getChargeStation: () => {
         const useStore: any = store()
-        let powerPoint: any = ChargingPile
+        let powerPoint: any = chargingPile.value
         let station: any
         if (!useStore.customSetting.basic.char || useStore.customSetting.basic.char == "") {
             station = powerPoint[0]
@@ -87,7 +86,6 @@ export default {
         }
         return station
     },
-
     //回桩充电
     goCharpile: (standby: any) => {
         robotUtil.setGocharTime()
@@ -116,6 +114,7 @@ export default {
                 y: standby.coordinate[1],
                 yaw: standby.yaw,
                 areaId: standby.areaId,
+                dockingRadius: (standby.properties && standby.properties.dockingRadius) ? standby.properties.dockingRadius : 0.5,
                 ext: {
                     name: standby.name,
                     id: standby.id
@@ -128,9 +127,17 @@ export default {
         };
         robotUtil.startTask(task)
     },
-
     //返航待命点
     goStandby: (standby: any) => {
+        const currentLanguage = getLocale()  //当前的语言
+        let fhz = ''
+        if (currentLanguage == 'zh-cn') {
+            fhz = "返航中"
+        } else if (currentLanguage == 'en') {
+            fhz = "Returning"
+        } else if (currentLanguage == 'zh-tw') {
+            fhz = "返航中"
+        }
         const useStore: any = store()
         let task = {
             name: "返航任务" + new Date().getTime(),
@@ -156,8 +163,9 @@ export default {
                 y: standby.coordinate[1],
                 yaw: standby.yaw,
                 areaId: standby.areaId,
+                dockingRadius: (standby.properties && standby.properties.dockingRadius) ? standby.properties.dockingRadius : 0.5,
                 ext: {
-                    name: "返航中",
+                    name: fhz,
                     id: standby.id
                 },
                 stepActs: [
@@ -167,14 +175,12 @@ export default {
         };
         robotUtil.startTask(task)
     },
-
-
     //取背景音乐
     getbackgroundSong: () => {
         const useStore: any = store()
         let songlists: any = songlist
         let song = null
-        if (!useStore.customSetting.sound.musicFile || useStore.customSetting.sound.musicFile == "") {
+        if (!useStore.customSetting.sound || !useStore.customSetting.sound.musicFile || useStore.customSetting.sound.musicFile == "") {
             song = songlists[0]
         } else {
             for (let i of songlists) {
@@ -189,9 +195,45 @@ export default {
         }
         return song.id
     },
+    //播放背景音乐
+    audioPlay: (id: any) => {
+        const useStore: any = store()
+        let volume = useStore.customSetting.sound.musicVolume
+        if (useStore.customSetting.sound.switchon && volume != 0) {
+            audioJsPlay(id, volume / 100)
+        }
+    },
+    //停止播放背景音乐
+    audioStop() {
+        const useStore: any = store()
+        let volume = useStore.customSetting.sound.musicVolume
+        if (useStore.customSetting.sound.switchon && volume != 0) {
+            audioJsStop()
+        }
+    },
+    //任务音频多语言
+    audioIdset: (audioid: any) => {
+        const currentLanguage = getLocale()  //当前的语言
+        let arrsplice = (str: any, index: any, char: any) => {
+            const strAry = str.split('');
+            strAry[index] = char;
+            return strAry.join('');
+        }
+        if (currentLanguage == 'zh-cn') {
+            audioid = arrsplice(audioid, 1, '1')
+        } else if (currentLanguage == 'en') {
+            audioid = arrsplice(audioid, 1, '2')
+        } else if (currentLanguage == 'zh-tw') {
+            audioid = arrsplice(audioid, 1, '3')
+        }
+        return audioid
+    },
 
+    //任务音频多语言
+    setlogs: (reqObj: any) => {
+        // robotUtil.exportOpreationLogger(reqObj)
+    },
     //异常对话框
-
     AbnormalControl: (e: number) => {
         if (e != 0) {
             if (router.currentRoute.value.path != "/crashstop" && router.currentRoute.value.path != "/ficsetting") {

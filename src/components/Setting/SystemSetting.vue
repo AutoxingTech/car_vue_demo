@@ -4,8 +4,8 @@ import { ref, reactive } from 'vue';
 import switchLanguage from './component/Switchlanguage.vue'
 import store from '../../store';
 import settingUtil from '../../js/settingUtil'
-import { ChargingPile } from '../../js/Datacollation'
-import { globalData, } from '../../js/globalData';
+import { chargingPile, standbyPoint } from '../../js/Datacollation'
+import { globalData, changeupdateMap } from '../../js/globalData';
 import { ControlLoading } from '../../js/settingUtil'
 import { toast } from '../Toast/Toast'
 import { OpenSetting, appVersion } from '../../js/android'
@@ -13,9 +13,12 @@ import { H5Version } from '../../js/globalConfig'
 import router from '../../router';
 import { useI18n } from 'vue-i18n'
 import { getLocale } from '../../main'
+import { robotUtil } from "../../js/robotUtil"
+import { initTable, setCurrentFloor } from '../../js/Datacollation'
+import BaseSettingtank from './component/BaseSettingtank.vue';
+import { Rlog } from '../../js/Rlog';
 const { locale, t } = useI18n()
 
-let ChargingPileList: any = ChargingPile
 const useStore: any = store()
 const CurrentappVersion = ref(appVersion())
 const modetype: any = reactive([{
@@ -47,7 +50,7 @@ const modetype: any = reactive([{
     img2: new URL('../../assets/img/sys_4.png', import.meta.url),
 }, {
     id: 5,
-    name: 'starup.xtsz',
+    name: 'setting.gxdt',
     sel: false,
     img1: new URL('../../assets/img/sys_5.png', import.meta.url),
     img2: new URL('../../assets/img/sys_5.png', import.meta.url),
@@ -64,24 +67,37 @@ const showChangeLan = ref(false)  //是否显示选择语言弹框
 
 const currentLanguage = ref(getLocale())  //当前的语言
 const showTapApk = ref(false)  //是否显示跳转apk
+const showrestartApp = ref(false) //是否显示重启app
 const showchangePass = ref(false)//是否显示更改密码
 
 const password1 = ref() //原密码
 const password2 = ref() //新密码
 const password3 = ref() //确认新密码
+
+const clickTimes = ref(0)
+const settingVisible = ref(false)
+
+const standbyPointList: any = standbyPoint  //待命点列表
+const chargingPileList: any = chargingPile  //充电桩
+const defaultstandby = ref(0) //默认待命点
+const defaultcharplie = ref(0) //默认充电桩
+const charname = ref() //充电桩name
+const standbyname = ref() //待命点name
+const controlType = ref(0)  //控制弹框相应显示内容
+const baseset: any = ref<null | HTMLElement>(null);
 //控制只能输入四个
 const setinputc = (item: any, e: number) => {
     if (e == 1) {
-        if (password1.value.length > 10) {
-            password1.value = String(password1.value).slice(0, 10)
+        if (password1.value.length > 4) {
+            password1.value = String(password1.value).slice(0, 4)
         }
     } else if (e == 2) {
-        if (password2.value.length > 10) {
-            password2.value = String(password2.value).slice(0, 10)
+        if (password2.value.length > 4) {
+            password2.value = String(password2.value).slice(0, 4)
         }
     } else if (e == 3) {
-        if (password3.value.length > 10) {
-            password3.value = String(password3.value).slice(0, 10)
+        if (password3.value.length > 4) {
+            password3.value = String(password3.value).slice(0, 4)
         }
     }
 
@@ -96,20 +112,25 @@ const tapChangepass = () => {
 }
 //确认修改密码
 const Changepassword = () => {
-    if (password1.value && password2.value && password3.value) {
-        if (password1.value == useStore.customSetting.basic.adminPass) {
-            if (password2.value == password3.value) {
-                if (password1.value !== password2.value) {
-                    useStore.$patch((state: any) => {
-                        state.customSetting.basic.adminPass = password2.value
-                    })
-                    tapChangepass()
-                    toast.show(t('setting.xgcg'))
+    if (password1.value && password2.value && password3.value) { //判断原密码和两次输入的新密码是否为空
+        if (password1.value == useStore.customSetting.basic.adminPass) {  //判断原密码是否相同
+            if (password2.value.length == 4 && password3.value.length == 4) {  //判断两次输入的密码是否都是4位
+                if (password2.value == password3.value) {  //判断两次输入的密码是否相同
+                    if (password1.value !== password2.value) { //判断原密码和旧密码是否相同
+                        useStore.$patch((state: any) => {  //成立修改
+                            state.customSetting.basic.adminPass = password2.value
+                        })
+                        tapChangepass()
+                        toast.show(t('setting.xgcg'))
+                    } else {
+                        toast.show(t('setting.xmmyymmxt'))
+                    }
                 } else {
-                    toast.show(t('setting.xmmyymmxt'))
+                    toast.show(t('setting.lcsrmmbxt'))
                 }
+
             } else {
-                toast.show(t('setting.lcsrmmbxt'))
+                toast.show(t('setting.qwsggnr'))
             }
         } else {
             toast.show(t('setting.ymmbzq'))
@@ -124,6 +145,10 @@ const Changepassword = () => {
 //控制跳转建图app的显示和隐藏
 const TapApkControl = () => {
     showTapApk.value = !showTapApk.value
+}
+//控制重启app确认弹框的显示和隐藏
+const restartApkControl = () => {
+    showrestartApp.value = !showrestartApp.value
 }
 //确认跳转建图app
 const TapAPK = () => {
@@ -140,6 +165,15 @@ const Setlanguage = (e: any) => {
     localStorage.setItem('language', e)
     locale.value = e
     showChangeLan.value = !showChangeLan.value
+    let languageindex = 1
+    if (e == 'zh-cn') {
+        languageindex = 1
+    } else if (e == 'en') {
+        languageindex = 2
+    } else if (e == 'zh-tw') {
+        languageindex = 3
+    }
+    robotUtil.setLanguage_P(languageindex)
 }
 //点击便捷功能
 const ModelClick = (e: number) => {
@@ -157,126 +191,299 @@ const ModelClick = (e: number) => {
         })
     } else if (e == 3) {
         //点击重启App
-        console.log('重启App')
-        settingUtil.restart()
+        restartApkControl()
     } else if (e == 4) {
-        //点击充电桩复位
+        // 点击充电桩复位
         ControlLoading(true)
         if (!useStore.customSetting.basic.char) {
             useStore.$patch((state: any) => {
-                state.customSetting.basic.char = ChargingPileList[0].id
+                state.customSetting.basic.char = chargingPileList.value[0].id
             })
         }
-        for (let item of ChargingPileList) {
+        for (let item of chargingPileList.value) {
             if (useStore.customSetting.basic.char == item.id) {
                 return settingUtil.setPos(item).then(() => {
                     ControlLoading(false)
+                    if (item.areaId) {
+                        setCurrentFloor(item.areaId)
+                    }
+                    toast.show(t('setting.cdzfwcg'))
                 })
             }
         }
     } else if (e == 5) {
-        //点击系统设置
-        console.log('系统设置')
-        OpenSetting()
+        // 点击系统设置
+        ControlLoading(true)
+        robotUtil.updateMap().then(() => {
+            return initTable()  //设置站点
+        }).then(() => {
+            return robotUtil.getState_P()
+        }).then((res: any) => {
+            setCurrentFloor(res.areaId)
+            changeupdateMap()
+            setstand() //更新当前页面的充电桩待命点以及弹框组件内的内容
+            ControlLoading(false)
+        })
     } else if (e == 6) {
         //点击WLAN
-        console.log('WLAN')
-        // router.push({
-        //     path: '/WifeSetting'
-        // })
+        router.push({
+            path: '/WifeSetting'
+        })
     }
 }
+
+function hiddenSetting() {
+    clickTimes.value++
+    if (clickTimes.value % 10 == 9) {
+        settingVisible.value = !settingVisible.value
+        clickTimes.value = 0
+    }
+}
+//充电桩 待命点弹框显示
+function TankControl(e: number) {
+    controlType.value = e
+    if (e == 3 || e == 5) {
+        baseset.value.setcur()
+    }
+}
+//回充电桩
+function gochargepile() {
+    settingUtil.goCharpile(settingUtil.getChargeStation())
+}
+//返航
+function gostandby() {
+    settingUtil.goStandby(settingUtil.getStandbyStation())
+}
+
+//修改待命点
+function ChangeStand(e: number) {
+    const type: number = e
+    useStore.$patch((state: any) => {
+        state.customSetting.basic.standby = type
+        defaultstandby.value = type
+    })
+    for (var i of standbyPointList.value) {
+        if (i.id == useStore.customSetting.basic.standby) {
+            standbyname.value = i.name
+            break
+        }
+    }
+    controlType.value = 0
+}
+
+//修改充电桩
+function ChangeChar(e: number) {
+    const type: number = e
+    useStore.$patch((state: any) => {
+        state.customSetting.basic.char = type
+        defaultcharplie.value = type
+    })
+    for (var i of chargingPileList.value) {
+        if (i.id == useStore.customSetting.basic.char) {
+            charname.value = i.name
+            break
+        }
+    }
+    controlType.value = 0
+}
+
+//设置 充电桩和待命点（不存在 及 存在areaid但是不存在站点的处理）
+function setstand() {
+    defaultstandby.value = 0
+    defaultcharplie.value = 0
+    charname.value = ''
+    standbyname.value = ''
+    if (!useStore.customSetting.basic.standby) {
+        defaultstandby.value = standbyPointList.value[0].id
+        useStore.$patch((state: any) => {
+            state.customSetting.basic.standby = standbyPointList.value[0].id
+        })
+    } else {
+        defaultstandby.value = useStore.customSetting.basic.standby
+    }
+    for (var i of standbyPointList.value) {
+        if (i.id == useStore.customSetting.basic.standby) {
+            standbyname.value = i.name
+            break
+        }
+    }
+    //设置里的站点如果不存在
+    if (!standbyname.value) {
+        defaultstandby.value = standbyPointList.value[0].id
+        useStore.$patch((state: any) => {
+            state.customSetting.basic.standby = standbyPointList.value[0].id
+        })
+        standbyname.value = standbyPointList.value[0].name
+    }
+
+
+    if (!useStore.customSetting.basic.char) {
+        defaultcharplie.value = chargingPileList.value[0].id
+        useStore.$patch((state: any) => {
+            state.customSetting.basic.char = chargingPileList.value[0].id
+        })
+    } else {
+        defaultcharplie.value = useStore.customSetting.basic.char
+    }
+    for (var i of chargingPileList.value) {
+        if (i.id == useStore.customSetting.basic.char) {
+            charname.value = i.name
+            break
+        }
+    }
+
+    //设置里的站点如果不存在
+    if (!charname.value) {
+        defaultcharplie.value = chargingPileList.value[0].id
+        useStore.$patch((state: any) => {
+            state.customSetting.basic.char = chargingPileList.value[0].id
+        })
+        charname.value = chargingPileList.value[0].name
+    }
+
+}
+setstand()
+defineExpose({ setstand });
+</script>
+<script lang="ts">
+import { defineComponent, nextTick } from 'vue';
+export default defineComponent({
+    beforeRouteEnter(to, from, next) {
+        next((vm) => {
+            const instance: any = vm;
+            instance.setstand()
+        })
+    }
+});
 </script>
 <template>
     <div>
+        <BaseSettingtank ref="baseset" :controlType="controlType" :StandbyPointList="standbyPointList"
+            @TankControl="TankControl" @change-stand="ChangeStand" @change-char="ChangeChar"
+            :ChargingPileList="chargingPileList" :Defaultcharplie="defaultcharplie" :Defaultstandby="defaultstandby">
+        </BaseSettingtank>
         <switchLanguage @changelanguage="Changelanguage" :currentLanguage="currentLanguage"
             :showChangeLan="showChangeLan" @last-changelan="Setlanguage">
         </switchLanguage>
         <div>
             <div class="sys_top">
-                <div class="sys_bj font4">{{$t('setting.bjgn')}}</div>
+                <div class="sys_bj font4">{{ $t('setting.bjgn') }}</div>
                 <div class="sys_modetype">
                     <!-- :class="item.sel?'sys_mode_one2':'sys_mode_one'"  -->
-                    <div v-for="(item,index) in modetype" :key="index"
-                        :class="index==0||index==1?(useStore.robotstate.isManualMode?(index==0?'sys_mode_one':'sys_mode_one2'):(index==0?'sys_mode_one2':'sys_mode_one') ):'sys_mode_one'"
+                    <div v-for="(item, index) in modetype" :key="index"
+                        :class="index == 0 || index == 1 ? (useStore.robotstate.isManualMode ? (index == 0 ? 'sys_mode_one' : 'sys_mode_one2') : (index == 0 ? 'sys_mode_one2' : 'sys_mode_one')) : 'sys_mode_one'"
                         @click="ModelClick(item.id)">
                         <!-- <img src="" alt=""> -->
-                        <img v-if="index>1" :src="item.img1" style="width:38px;height: 38px;margin-bottom: 13px;">
-                        <img v-if="index==0" :src="useStore.robotstate.isManualMode?item.img1:item.img2"
+                        <img v-if="index > 1" :src="item.img1" style="width:38px;height: 38px;margin-bottom: 13px;">
+                        <img v-if="index == 0" :src="useStore.robotstate.isManualMode ? item.img1 : item.img2"
                             style="width:38px;height: 38px;margin-bottom: 13px;">
-                        <img v-if="index==1" :src="useStore.robotstate.isManualMode?item.img2:item.img1"
+                        <img v-if="index == 1" :src="useStore.robotstate.isManualMode ? item.img2 : item.img1"
                             style="width:38px;height: 38px;margin-bottom: 13px;">
 
                         <!-- <img :src="item.img1" alt="" style="width:38px;height: 38px;margin-bottom: 13px;" /> -->
-                        <div v-if="index==0" :style="!useStore.robotstate.isManualMode?'color:white':''">
-                            {{$t(item.name)}}
+                        <div v-if="index == 0" :style="!useStore.robotstate.isManualMode ? 'color:white' : ''">
+                            {{ $t(item.name) }}
                         </div>
-                        <div v-if="index==1" :style="useStore.robotstate.isManualMode?'color:white':''">
-                            {{$t(item.name)}}
+                        <div v-if="index == 1" :style="useStore.robotstate.isManualMode ? 'color:white' : ''">
+                            {{ $t(item.name) }}
                         </div>
-                        <div v-if="index>1">{{$t(item.name)}}</div>
+                        <div v-if="index > 1">{{ $t(item.name) }}</div>
                     </div>
                 </div>
             </div>
         </div>
+
+        <!-- 返航待命点 -->
+        <div class="char_sel" @click="TankControl(3)">
+            <div>
+                <div class="char_top">
+                    <div class="setname font4">{{ $t('setting.fhdmd') }}</div>
+                    <div class="setdesc" style='margin-left:13px'>{{ $t('setting.cjfhsfhwz') }}</div>
+                    <div class="box_rightset font5" style="right:0">
+                        <div style="margin-right:20px">{{ standbyname }}</div>
+                        <img src="../../assets/img/setting_arrow_down.png" style="width: 16px;height: 9px;">
+                    </div>
+                </div>
+            </div>
+            <div @click.stop="gostandby">{{ $t('setting.yjfh') }}</div>
+        </div>
+
+        <!-- 回桩充电 -->
+        <div class="char_sel" @click="TankControl(5)">
+            <div>
+                <div class="char_top">
+                    <div class="setname font4">{{ $t('setting.cdzxz') }}</div>
+                    <div class="setdesc" style='margin-left:13px'>{{ $t('setting.xzjqrcdz') }}</div>
+                    <div class="box_rightset font5" style="right:0">
+                        <div style="margin-right:20px">{{ charname }}</div>
+                        <img src="../../assets/img/setting_arrow_down.png" style="width: 16px;height: 9px;">
+                    </div>
+                </div>
+            </div>
+
+            <div @click.stop="gochargepile">{{ $t('setting.hzcd') }}</div>
+        </div>
+
         <div class="sys_setting" @click="Changelanguage()">
             <div>
                 <div>
-                    <span class="sys_span1 font4">{{$t('setting.dyysz')}}</span>
+                    <span class="sys_span1 font4">{{ $t('setting.dyysz') }}</span>
                 </div>
-                <div>{{$t('setting.qhyy')}}</div>
+                <div style="position:relative">
+                    <div class="now_lan">
+                        <span v-if="currentLanguage == 'zh-cn'">简体中文</span>
+                        <span v-if="currentLanguage == 'en'">English</span>
+                        <span v-if="currentLanguage == 'zh-tw'">繁体中文</span>
+                    </div>
 
-                <div class="now_lan">
-                    <span v-if="currentLanguage=='zh-cn'">简体中文</span>
-                    <span v-if="currentLanguage=='en'">English</span>
-                    <span v-if="currentLanguage=='zh-tw'">繁体中文</span>
+                    {{ $t('setting.qhyy') }}
                 </div>
             </div>
         </div>
         <div class="sys_setting" @click="tapChangepass()">
             <div>
                 <div>
-                    <span class="sys_span1 font4">{{$t('setting.glymm')}}</span>
+                    <span class="sys_span1 font4">{{ $t('setting.glymm') }}</span>
                 </div>
-                <div>{{$t('setting.xgmm')}}</div>
+                <div>{{ $t('setting.xgmm') }}</div>
             </div>
         </div>
-        <!-- <div class="sys_setting">
+        <div class="sys_setting" v-if="settingVisible">
             <div>
                 <div>
-                    <span class="sys_span1 font4">车机建图APP</span>
+                    <span class="sys_span1 font4">{{ $t('starup.xtsz') }}</span>
                 </div>
-                <div @click="TapApkControl">进入车机建图</div>
+                <div @click="OpenSetting">{{ $t('setting.dkxtsz') }}</div>
             </div>
-        </div> -->
+        </div>
         <div class="sys_message">
-            <div class="sys_message_top font4">{{$t('setting.xtxx')}}</div>
+            <div class="sys_message_top font4" @click="hiddenSetting">{{ $t('setting.xtxx') }}</div>
             <!-- <div class="sys_onemessage">
                 <div>机器人类型</div>
                 <div>R1餐厅机器人</div>
             </div> -->
 
             <div class="sys_onemessage">
-                <div>{{$t('setting.jqrsn')}}</div>
-                <div>{{globalData.sn}}</div>
+                <div>{{ $t('setting.jqrsn') }}</div>
+                <div>{{ globalData.sn }}</div>
             </div>
 
             <div class="sys_onemessage">
-                <div>{{$t('setting.jqrbb')}}</div>
-                <div>{{H5Version}} ({{CurrentappVersion.split(',')[1]}})</div>
+                <div>{{ $t('setting.jqrbb') }}</div>
+                <div>{{ H5Version }} ({{ CurrentappVersion.split(',')[1] }})</div>
             </div>
             <div class="sys_onemessage">
-                <div>{{$t('setting.jqrdpbb')}}</div>
+                <div>{{ $t('setting.jqrdpbb') }}</div>
                 <div>
-                    <span v-if="useStore.vers">{{useStore.vers}}</span>
-                    <span v-else>{{$t('setting.zwsj')}}</span>
+                    <span v-if="useStore.vers">{{ useStore.vers }}</span>
+                    <span v-else>{{ $t('setting.zwsj') }}</span>
                 </div>
             </div>
             <div class="sys_onemessage noborder">
-                <div>{{$t('setting.jqrsdkbb')}}</div>
+                <div>{{ $t('setting.jqrsdkbb') }}</div>
                 <div>
-                    <span v-if="useStore.sdkVers">{{useStore.sdkVers}}</span>
-                    <span v-else>{{$t('setting.zwsj')}}</span>
+                    <span v-if="useStore.sdkVers">{{ useStore.sdkVers }}</span>
+                    <span v-else>{{ $t('setting.zwsj') }}</span>
                 </div>
             </div>
         </div>
@@ -284,48 +491,61 @@ const ModelClick = (e: number) => {
         <div class="mask_tapapk" v-if="showTapApk">
             <div class="_makcontent">
                 <div class="tip_apk">
-                    {{$t('setting.sftz')}}
+                    {{ $t('setting.sftz') }}
                 </div>
                 <div class="tip_meth">
-                    <div @click="TapApkControl">否 {{$t('setting.fou')}}</div>
-                    <div @click="TapAPK">是{{$t('setting.shi')}}</div>
+                    <div @click="TapApkControl">{{ $t('setting.fou') }}</div>
+                    <div @click="TapAPK">{{ $t('setting.shi') }}</div>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="mask_tapapk" v-if="showrestartApp">
+            <div class="_makcontent">
+                <div class="tip_apk">
+                    {{ $t('setting.sfcqcjApp') }}
+                </div>
+                <div class="tip_meth">
+                    <div @click="restartApkControl"> {{ $t('setting.fou') }}</div>
+                    <div @click="settingUtil.restart()">{{ $t('setting.shi') }}</div>
                 </div>
             </div>
         </div>
         <!-- 修改密码 -->
         <div class="update_password" v-if="showchangePass">
             <div class="_makcontent2">
-                <div class="update_password_header font6">{{$t('setting.xgmm')}}</div>
+                <div class="update_password_header font6">{{ $t('setting.xgmm') }}</div>
                 <div class="password_cont">
                     <div class="passwrod_line">
                         <div>
-                            {{$t('setting.ymm')}}:
+                            {{ $t('setting.ymm') }}:
                         </div>
                         <input type="tel" pattern="[0-9]*" :placeholder="$t('setting.qsrymm')" v-model="password1"
-                            onkeyup="value=value.replace(/[^\d]/g,'')" @input="setinputc($event,1)"
+                            onkeyup="value=value.replace(/[^\d]/g,'')" @input="setinputc($event, 1)"
                             style="-webkit-text-security:disc" />
                     </div>
                     <div class="passwrod_line">
                         <div>
-                            {{$t('setting.xmm')}}:
+                            {{ $t('setting.xmm') }}:
                         </div>
                         <input type="tel" pattern="[0-9]*" :placeholder="$t('setting.qsrxmm')" v-model="password2"
-                            onkeyup="value=value.replace(/[^\d]/g,'')" @input="setinputc($event,2)"
+                            onkeyup="value=value.replace(/[^\d]/g,'')" @input="setinputc($event, 2)"
                             style="-webkit-text-security:disc">
                     </div>
                     <div class="passwrod_line" style="margin-bottom:0">
                         <div>
-                            {{$t('setting.zcsrmm')}}:
+                            {{ $t('setting.zcsrmm') }}:
                         </div>
                         <input type="tel" pattern="[0-9]*" :placeholder="$t('setting.xrxmm')" v-model="password3"
-                            onkeyup="value=value.replace(/[^\d]/g,'')" @input="setinputc($event,3)"
+                            onkeyup="value=value.replace(/[^\d]/g,'')" @input="setinputc($event, 3)"
                             style="-webkit-text-security:disc">
                     </div>
                 </div>
 
                 <div class="tip_meth">
-                    <div @click="tapChangepass">{{$t('index.qx')}}</div>
-                    <div @click="Changepassword">{{$t('index.qd')}}</div>
+                    <div @click="tapChangepass">{{ $t('index.qx') }}</div>
+                    <div @click="Changepassword">{{ $t('index.qd') }}</div>
                 </div>
 
             </div>
@@ -396,10 +616,6 @@ const ModelClick = (e: number) => {
 
 }
 
-
-
-
-
 .sys_setting {
     height: 86px;
     width: 100%;
@@ -424,11 +640,14 @@ const ModelClick = (e: number) => {
 .now_lan {
     height: 100%;
     position: absolute;
-    right: 180px;
-    line-height: 86px;
-    font-size: 16px;
+    right: 1.40625rem;
+    /* line-height: 0.67188rem; */
+    font-size: 0.125rem;
     font-weight: bold;
     color: #83A9FF;
+    left: px;
+    left: -80px;
+    white-space: nowrap;
 }
 
 .sys_setting>div>div:nth-child(1) {
@@ -437,8 +656,9 @@ const ModelClick = (e: number) => {
 }
 
 .sys_setting>div>div:nth-child(2) {
-    width: 120px;
-    height: 40px;
+    min-width: 120px;
+    padding: 0 25px;
+    box-sizing: border-box;
     background: #83A9FF;
     border-radius: 13px;
     font-size: 16px;
@@ -517,7 +737,7 @@ const ModelClick = (e: number) => {
     top: 50%;
     left: 50%;
     margin-left: -267.5px;
-    margin-top: -169px;
+    margin-top: -118px;
 
 }
 
@@ -595,7 +815,7 @@ const ModelClick = (e: number) => {
 }
 
 .passwrod_line>div:nth-child(1) {
-    width: 160px;
+    width: 190px;
     font-size: 20px;
     color: #666666;
     display: flex;
@@ -643,5 +863,67 @@ const ModelClick = (e: number) => {
     margin-top: -169px;
     padding-bottom: 20px;
 
+}
+
+.char_sel {
+    height: 145px;
+    width: 100%;
+    background: #FFFFFF;
+    border-radius: 13px;
+    padding: 0 34px;
+    box-sizing: border-box;
+    margin-top: 13px;
+}
+
+.char_sel>div:nth-child(1) {
+    height: 73px;
+    display: flex;
+}
+
+.char_sel>div:nth-child(2) {
+    width: 100%;
+    height: 58px;
+    background: #83A9FF;
+    border-radius: 13px;
+    font-size: 16px;
+    font-weight: bold;
+    color: #FFFFFF;
+    text-align: center;
+    line-height: 58px;
+}
+
+.char_top {
+    display: flex;
+    height: 100%;
+    align-items: center;
+    position: relative;
+    width: 100%;
+}
+
+.setname {
+    font-weight: 400;
+    color: #333333;
+}
+
+.setdesc {
+    font-size: 16px;
+    font-weight: 400;
+    color: #999999;
+    margin-left: 60px;
+}
+
+.box_rightset {
+    position: absolute;
+    right: 34px;
+    height: 100%;
+    top: 0;
+    display: flex;
+    align-items: center;
+}
+
+.box_rightset>div {
+    font-weight: 400;
+    color: #333333;
+    line-height: 19px;
 }
 </style>

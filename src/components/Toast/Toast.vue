@@ -18,7 +18,7 @@ const msg: any = props.msg
 .mask_totaltip {
     width: 240px;
     height: 130px;
-    background: #83a9ff;
+    background: #3EC130;
     opacity: 0.8;
     border-radius: 31px;
     position: fixed;
@@ -45,5 +45,8 @@ const msg: any = props.msg
 .mask_totaltip>div:nth-child(2) {
     text-align: center;
     font-size: 23px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 </style>

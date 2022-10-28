@@ -18,7 +18,6 @@ onMounted(() => {
   }
 })
 </script>
-
 <template>
   <div class="all">
     <Abnormal></Abnormal>

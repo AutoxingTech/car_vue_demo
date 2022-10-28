@@ -6,7 +6,7 @@ const props = defineProps({
         type: [Number, String, Boolean],
     },
     trueValue: {
-        type: [Number, String, Boolean],
+        type: Boolean,
         default: true,
     },
     falseValue: {
@@ -32,7 +32,7 @@ const handleInput = () => {
 const input = ref()
 //判断当前组件是否是打开状态
 const checked = ref(computed(() => {
-    return checkin.value === props.trueValue
+    return props.modelValue == props.trueValue
 }))
 
 </script>
@@ -40,7 +40,7 @@ const checked = ref(computed(() => {
 <template>
     <div class="d-switch" :class="checked?'is-checked':''">
         <input class="d-switch__input" ref="input" type="checkbox" :checked="checked" @change="handleInput"
-            :true-value="trueValue" :false-value="falseValue" />
+            :true-value="trueValue" />
         <span class="d-switch_action"></span>
     </div>
 </template>

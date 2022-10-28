@@ -6,218 +6,164 @@
         <div class="container" :style="safeHeight">
             <div class="section">
                 <div class="cell">
-                    <text class="title" style="color: #5677E7;" @click="goLogPage">WIFI</text>
-                    <text class="subtitle" style="color: #5677E7;">{{ stateToast}}</text>
-                    <text class="subtitle">{{ wifiName}}</text>
-                    <Soundswitch v-model="wifiEnable" @change-switch="Changeswitch"></Soundswitch>
+                    <text class="title" style="color: #5677E7;">WIFI</text>
+                    <text v-if="!wifiName" class="subtitle" style="color: #5677E7;">{{ stateToast }}</text>
+                    <text class="subtitle">{{ wifiName }}</text>
+                    <Soundswitch v-model="wifiEnable"></Soundswitch>
+                    <div @click="onSwitchChange"
+                        style="height: 60px;width: 80px;position: absolute;right: 60px;z-index: 99;">
+                        <div style="height: 60px;width: 80px;"></div>
+                    </div>
                 </div>
             </div>
             <div class="section scrolls" :style="poiScrollHeight">
                 <div v-for="(item, index) in wifiList" :key="index">
                     <div class="cell" @click="onWifiConfirm(item)">
-                        <text class="title">{{item.ssid}}</text>
-                        <text class="subtitle">{{item.ssid==wifiName ? '已连接' : ""}}</text>
+                        <text class="title">{{ item.ssid }}</text>
+                        <text class="subtitle">{{ item.ssid == wifiName ? $t('wifi.ylj') : "" }}</text>
                         <img v-if="item.isPwd" src="../assets/img/wifi_pwd.png"
                             style="width: 30px;height: 30px;margin: 0 20px;" />
-                        <img :src="item.img" style="width: 30px;height: 30px;margin: 0 20px;" />
+                        <img src="../assets/img/wifi_icon.png" v-if="item.level == 2"
+                            style="width: 30px;height: 30px;margin: 0 20px;" />
+                        <img src="../assets/img/wifi_2.png" v-if="item.level == 1"
+                            style="width: 30px;height: 30px;margin: 0 20px;" />
+                        <img src="../assets/img/wifi_1.png" v-if="item.level != 2 && item.level != 1"
+                            style="width: 30px;height: 30px;margin: 0 20px;" />
                     </div>
                     <div class="cell_line"></div>
                 </div>
             </div>
 
             <div v-if="skipShow" class="flexColumnCenter btnSubmit" @click="onSkip">
-                <text style="color: #FFFFFF;font-size: 23px;font-weight: bold;">{{btnTitle}}({{timeLimit}})</text>
+                <text style="color: #FFFFFF;font-size: 23px;font-weight: bold;">{{ btnTitle }}({{ timeLimit }})</text>
             </div>
         </div>
     </div>
 
-    <div class="model_on" v-if="modelshow!=0">
+    <div class="model_on" v-if="modelshow != 0">
         <div class="on1">
-            <div>{{currentwife.ssid}}</div>
-            <div :class="modelshow==2?'inp':'inp2'"> <input type="text" placeholder="请输入密码" v-model="password"
-                    v-if="modelshow==2"> </div>
+            <div>{{ currentwife.ssid }}</div>
+            <div :class="modelshow == 2 ? 'inp' : 'inp2'"> <input type="text" :placeholder="$t('wifi.qsrmm')"
+                    v-model="password" v-if="modelshow == 2"> </div>
             <div class="bottom_tip">
-                <div @click="canclmodel">取消</div>
-                <div @click="forgetpass" v-if="modelshow==1">忘记网络</div>
-                <div v-if="modelshow==2" @click="connectwifeon">连接</div>
+                <div @click="canclmodel">{{ $t('index.qx') }}</div>
+                <div @click="forgetpass" v-if="modelshow == 1">{{ $t('wifi.wjwl') }}</div>
+                <div v-if="modelshow == 2" @click="connectwifeon">{{ $t('wifi.lj') }}</div>
             </div>
         </div>
     </div>
 </template>
 
-
 <script lang="ts">
 import { defineComponent, watch } from 'vue';
+import { toast } from './Toast/Toast';
 export default defineComponent({
     beforeRouteEnter(to, from, next) {
         next((vm) => {
             const instance: any = vm;
-            instance.onTimeLimit()
-            //检查是否开启wife
-            wifi_command({ event: 'enable' })
-            const wifeEnablewatch = watch(
-                () => wifeEnable, (newvalue: any, oldvalue: any) => {
-                    instance.wifiEnable = JSON.parse(newvalue).data
-                    if (instance.wifiEnable == true) {
-                        wifi_command({ event: 'info' })
-                    } else {
+            instance.onTimeLimit() //开始倒计时
+            wifi_command(JSON.stringify({ event: 'openBroadcast' }))
+            instance.onwifeEnable()
+            // 状态监听
+            instance.EventWath = watch(() => wifeEvent.value, (newvalue: any, oldvalue: any) => {
+                if (newvalue.event == "wifi_enable") {
+                    if (instance.inpagetime.length != 3) {
+                        instance.inpagetime.push(1)
+                        return
+                    }
+                    const tmpWifiEnable = parseInt(newvalue.data);
+                    if (tmpWifiEnable == 0) {
+                        instance.wifiName = instance.t('wifi.zzgb')
+                    } else if (tmpWifiEnable == 1) {
                         instance.wifiName = "";
-                        instance.wifiList = [];
-                    }
-                }
-            );
-            //wife信息监听
-            const wifeInfowatch = watch(
-                () => wifeInfo, (newvalue: any, oldvalue: any) => {
-                    const resObj = JSON.parse(newvalue);
-                    if (resObj.data) {
-                        instance.wifiName = resObj.data;
-                        instance.btnTitle = '下一步'
-                    } else {
+                        if (instance.wifiEnable) {
+                            instance.wifiEnable = false;
+                            instance.wifiList = [];
+                        }
+                    } else if (tmpWifiEnable == 2) {
+                        instance.wifiName = instance.t('wifi.zzdk')
+                    } else if (tmpWifiEnable == 3) {
                         instance.wifiName = "";
-                    }
-                    if (instance.wifiName !== "") {
-                        instance.stateToast = "";
-                    }
-                    wifi_command({ event: 'list' })
-                }
-            );
-            //wife list监听
-            const wifeListwatch = watch(
-                () => wifeInfo, (newvalue: any, oldvalue: any) => {
-                    const resObj = JSON.parse(newvalue);
-                    let tmpList = [];
-                    for (let s of resObj.data) {
-                        if (s.capabilities.indexOf("EAP") > -1) {
-                            s.isPwd = true;
-                            s.type = "eap";
-                        } else if (s.capabilities.indexOf("WPA") > -1) {
-                            s.isPwd = true;
-                            s.type = "wpa";
-                        } else if (s.capabilities.indexOf("WEP") > -1) {
-                            s.isPwd = true;
-                            s.type = "wep";
-                        } else {
-                            s.isPwd = false;
+                        if (!instance.wifiEnable) {
+                            instance.wifiEnable = true
+                            instance.onwifiinfo()
                         }
-                        if (s.level == 2) {
-                            s.img = "../../static/image/wifi_icon.png";
-                        } else if (s.level == 1) {
-                            s.img = "../../static/image/wifi_2.png";
+                    }
+                } else if (newvalue.event == "wifi_state") {
+                    if (instance.inpagetime.length != 3) {
+                        instance.inpagetime.push(1)
+                        return
+                    }
+                    if (newvalue.data == "CONNECTED") {
+                        let wifiinfo = wifi_command(JSON.stringify({ event: 'info' }))
+                        if (wifiinfo && JSON.parse(wifiinfo).data) {
+                            clearTimeout(instance.downtime)
+                            clearTimeout(instance.downtime2)
+                            clearTimeout(instance.downtime3)
+                            instance.stateToast = ''
+                            instance.wifiConnecting = false
+                            instance.wifiName = JSON.parse(wifiinfo).data
+                            instance.btnTitle = instance.t('wifi.xyb')
                         } else {
-                            s.img = "../../static/image/wifi_1.png";
+                            instance.wifiName = "";
                         }
-                        tmpList.push(s);
                     }
-                    instance.wifiList = [];
-                    instance.wifiList = tmpList;
-                    //检查wife列表
-                    if (instance.wifiList.length == 0) {
-                        clearTimeout(instance.timeoutIdWifiList)
-                        instance.timeoutIdWifiList = setTimeout(() => {
-                            wifi_command({ event: 'list' })
-                        }, 3000);
+                } else if (newvalue.event == "wifi_password") {
+                    if (instance.inpagetime.length != 3) {
+                        instance.inpagetime.push(1)
+                        return
                     }
-                }
-            );
-            //wife状态检测
-            const wifecontentstatuewatch = watch(
-                () => wifecontentstatue, (newvalue: any, oldvalue: any) => {
-                    wifi_command({ event: 'enable' })
-                }
-            );
-            //忘记网络
-            const forgetwifewatch = watch(
-                () => forgetwife, (newvalue: any, oldvalue: any) => {
-                    instance.wifiName = "";
-                    wifi_command({ event: 'list' })
-                }
-            );
-            //连接网络
-            const connectwifewatch = watch(
-                () => connectwife, (newvalue: any, oldvalue: any) => {
-                    instance.wifiConnecting = true;
-                    instance.wifiName = "";
-                    instance.stateToast = '正在连接'
-                }
-            )
-            //状态监听
-            const eventReceive = watch(
-                () => wifeEvent, (newvalue: any, oldvalue: any) => {
+                    if (instance.wifiConnecting) {
+                        if (newvalue.data == "error")
+                            instance.downtime = setTimeout(() => {
+                                instance.stateToast = instance.t('wifi.mmcw')
+                                instance.downtime2 = setTimeout(() => {
+                                    instance.stateToast = "";
+                                    instance.wifiConnecting = false
+                                    clearTimeout(instance.downtime)
+                                    clearTimeout(instance.downtime2)
+                                    clearTimeout(instance.downtime3)
+                                }, 3000);
+                            }, 1000);
+                    }
 
-                    if (newvalue.event == "wifi_enable") {
-                        const tmpWifiEnable = parseInt(newvalue.data);
-                        if (tmpWifiEnable == 0) {
-                            instance.wifiName = '正在关闭'
-                        } else if (tmpWifiEnable == 1) {
-                            instance.wifiName = "";
-                            if (instance.wifiEnable) {
-                                instance.wifiEnable = false;
-                                instance.wifiList = [];
-                            }
-                        } else if (tmpWifiEnable == 2) {
-                            instance.wifiName = instance.$t('settingwifi.zzdk');
-                        } else if (tmpWifiEnable == 3) {
-                            instance.wifiName = "";
-                            if (!instance.wifiEnable) {
-                                instance.wifiEnable = true;
-                                wifi_command({ event: 'info' })
-                            }
-                        }
-                    } else if (newvalue.event == "wifi_state") {
-                        if (newvalue.data == "CONNECTED") {
-                            wifi_command({ event: 'info' })
-                        }
-                    } else if (newvalue.event == "wifi_password") {
-                        instance.wifiName = "";
-                        if (instance.wifiConnecting) {
-                            instance.stateToast = '密码错误'
-                            setTimeout(() => {
-                                instance.wifiConnecting = false;
-                                instance.stateToast = "";
-                            }, 3000);
-                        }
-                    }
-                })
+                }
+            })
         });
     },
+    //关闭监听
+    beforeRouteLeave(to, from, next) {
+        next((vm) => {
+            const instance: any = vm;
+            instance.EventWath = ''
+            wifi_command(JSON.stringify({ event: ' closeBroadcast' }))
+        })
+    }
 });
 </script>
 
 <script lang="ts" setup>
 import { computed } from '@vue/reactivity';
-import { reactive, ref } from 'vue';
+import { ref } from 'vue';
 import Soundswitch from '../components/Setting/component/WifSwitch.vue'
-import { wifi_command, wifeEnable, wifeList, wifeInfo, wifecontentstatue, forgetwife, connectwife, wifeEvent } from "../js/android";
+import { wifi_command, wifeEvent } from "../js/android";
 import router from '../router';
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 const skipShow = ref(true)  //跳过按钮
 const wifiEnable = ref(true)  //开启wife
 const wifiConnecting = ref(false)  //是否连接
-const wifiName = ref('TP-LINK 1007')
-const wifiList: any = reactive([
-    {
-        ssid: 'TP-LINK 1008',
-        img: new URL('../assets/img/wifi_icon.png', import.meta.url),
-        isPwd: 111
-    },
-    {
-        ssid: 'kasnkajs',
-        img: new URL('../assets/img/wifi_icon.png', import.meta.url),
-    },
-    {
-        ssid: 'TP-LINK 1007',
-        img: new URL('../assets/img/wifi_icon.png', import.meta.url),
-    },
-    {
-        ssid: 'TP-LINK 1006',
-        img: new URL('../assets/img/wifi_icon.png', import.meta.url),
-    }
-])
-const btnTitle = ref('跳过')  //按钮显示内容
-const timeLimit = ref(10)   //倒计时
+const wifiName = ref('')
+const wifiList: any = ref()
+const btnTitle = ref(t('starup.tg'))  //按钮显示内容
+const timeLimit = ref(300)   //倒计时
 let timeoutId: any = ''
-const timeoutIdWifiList = ref(-1)
+let timeoutIdWifiList: any = ''
 const stateToast = ref('')   //提示
+const inpagetime = ref([])
+const downtime: any = ref('')
+const downtime2: any = ref('')
+const downtime3: any = ref('')
 const safeHeight = computed({
     get() {
         let h = document.documentElement.clientHeight - 158
@@ -234,13 +180,11 @@ const poiScrollHeight = computed({
     set(value) {
     }
 })
-const currentwife: any = ref('')
-const modelshow = ref(0)
-const password = ref('')
-
-const goLogPage = () => {
-}
-
+const currentwife: any = ref('') //当前点击的wifi数据
+const modelshow = ref(0)  //点击后的弹框
+const password = ref('') //输入的密码
+const EventWath = ''
+const forgetwifi = ref(false)
 const onTimeLimit = () => {
     timeoutId = setTimeout(() => {
         if (timeLimit.value > 0) {
@@ -259,19 +203,39 @@ const canclmodel = () => {
 }
 //忘记网络
 const forgetpass = () => {
-    wifi_command({ event: "forget", ssid: currentwife.value.ssid })
+    stateToast.value = ''
+    wifi_command(JSON.stringify({ event: "forget", ssid: currentwife.value.ssid }))
+    wifiName.value = "";
+    onsearchlist();
+    canclmodel()
 }
 //连接wife
 const connectwifeon = () => {
-    if (password.value && password.value.length > 0) {
-        wifi_command({ event: "connect", ssid: currentwife.value.ssid, password: password.value })
+    clearTimeout(downtime3.value)
+    clearTimeout(downtime.value)
+    clearTimeout(downtime2.value)
+    if (password.value && password.value.length >= 8) {
+        downtime3.value = setTimeout(() => {
+            setTimeout(() => {
+                stateToast.value = t('wifi.ljcs')
+                setTimeout(() => {
+                    stateToast.value = "";
+                    wifiConnecting.value = false
+                }, 2000);
+            }, 1000);
+        }, 30 * 1000);
+        stateToast.value = t('wifi.zzlj')
+        wifi_command(JSON.stringify({ event: "connect", ssid: currentwife.value.ssid, password: password.value }))
+        wifiConnecting.value = true;
+        wifiName.value = ''
+        canclmodel()
+    } else {
+        toast.show(t("wifi.mmcdbndy"))
     }
 }
 //点击wife
 const onWifiConfirm = (e: any) => {
     currentwife.value = e
-    console.log(currentwife.value, "当前wife")
-    console.log(wifiName.value, "无线名称")
     if (wifiName.value == e.ssid) {
         modelshow.value = 1
     } else {
@@ -279,20 +243,83 @@ const onWifiConfirm = (e: any) => {
             modelshow.value = 2
         } else {
             wifi_command({ event: "connect", ssid: currentwife.value.ssid, password: "" })
+            wifiConnecting.value = true;
+            wifiName.value = "";
+            stateToast.value = t('wifi.zzlj')
         }
     }
 }
+//点击跳过
 const onSkip = () => {
     clearTimeout(timeoutId)
     timeLimit.value = 300
     router.back()
 }
-const Changeswitch = (e: boolean) => {
-    // wifi_command({ event: 'setEnable', enable: !wifiEnable.value })
-    wifiEnable.value = !wifiEnable.value
-    console.log(e, "当前状态")
+
+//切换 开启或者关闭wifi
+const onSwitchChange = () => {
+    wifi_command(JSON.stringify({ event: 'setEnable', enable: !wifiEnable.value }))
 }
-defineExpose({ wifiEnable, wifiName, wifiList, btnTitle, stateToast, timeoutIdWifiList, wifiConnecting, onTimeLimit });
+
+const onwifiinfo = () => {
+    let wifiinfo = wifi_command(JSON.stringify({ event: 'info' }))
+    if (wifiinfo && JSON.parse(wifiinfo).data) {
+        wifiName.value = JSON.parse(wifiinfo).data
+        btnTitle.value = t('wifi.xyb')
+    } else {
+        wifiName.value = "";
+    }
+    if (wifiName.value !== "") {
+        stateToast.value = "";
+    }
+    onsearchlist()
+}
+const onsearchlist = () => {
+    let resObj = JSON.parse(wifi_command(JSON.stringify({ event: 'list' })))
+    let tmpList = [];
+    for (let s of resObj.data) {
+        if (s.capabilities.indexOf("EAP") > -1) {
+            s.isPwd = true;
+            s.type = "eap";
+        } else if (s.capabilities.indexOf("WPA") > -1) {
+            s.isPwd = true;
+            s.type = "wpa";
+        } else if (s.capabilities.indexOf("WEP") > -1) {
+            s.isPwd = true;
+            s.type = "wep";
+        } else {
+            s.isPwd = false;
+        }
+
+        tmpList.push(s);
+    }
+    wifiList.value = [];
+    wifiList.value = tmpList;
+}
+
+const onwifeEnable = () => {
+    let enablecheck = wifi_command(JSON.stringify({ event: 'enable' }))
+    wifiEnable.value = JSON.parse(enablecheck).data
+    //如果开启了wifi
+    let cheakwife = (e: boolean) => {
+        if (e == true) {
+            onwifiinfo()
+            //检查wife列表
+            if (wifiList.value.length == 0) {
+                clearTimeout(timeoutIdWifiList)
+                timeoutIdWifiList = setTimeout(() => {
+                    onsearchlist()
+                }, 3000);
+            }
+        } else {
+            wifiName.value = "";
+            wifiList.value = [];
+        }
+    }
+    cheakwife(JSON.parse(enablecheck).data)
+}
+
+defineExpose({ wifiEnable, wifiName, wifiList, btnTitle, stateToast, timeoutIdWifiList, wifiConnecting, inpagetime, EventWath, downtime, downtime2, downtime3, onTimeLimit, onwifeEnable, onwifiinfo, t });
 </script>
 
 
@@ -397,6 +424,7 @@ page {
     line-height: 70px;
     font-weight: bold;
     text-align: center;
+    font-size: 23px;
 }
 
 .bottom_tip {

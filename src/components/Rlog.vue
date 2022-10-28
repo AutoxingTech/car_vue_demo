@@ -1,7 +1,7 @@
 
 
 <script lang="ts" setup>
-import { Logs } from '../js/globalData'
+import { Logs, cleanLog } from '../js/globalData'
 import store from '../store'
 const userstore: any = store()
 let logtime: any = ''
@@ -18,12 +18,17 @@ const getTouchStart = (item: any) => {
 const getTouchEnd = () => {
     clearTimeout(logtime);
 }
+const cleanbug = () => {
+    cleanLog()
+}
 </script>
 
 <template>
     <div class="filter_top" v-if="userstore.showLogs" @click="closeLog">
-        <div v-for="(item,index) in Logs" :key="index" @touchstart.pervent="getTouchStart(item)"
-            @touchend.pervent="getTouchEnd" class="onelog">{{item}}</div>
+        <div v-for="(item, index) in Logs" :key="index" @touchstart.pervent="getTouchStart(item)"
+            @touchend.pervent="getTouchEnd" class="onelog">{{ item }}</div>
+
+        <div class="right_log" @click.stop="cleanbug">清空</div>
     </div>
 </template>
 
@@ -43,12 +48,26 @@ const getTouchEnd = () => {
 }
 
 .onelog {
-    margin: 10px 20px;
-    font-size: 28px;
+    margin: 2px 0px;
+    font-size: 20px;
     color: #333333;
     display: flex;
     flex-wrap: wrap;
-    padding: 20px 0;
+    padding: 2px 20px;
     border-bottom: 2px dashed #999999;
+    width: 100%;
+    box-sizing: border-box;
+    word-break: break-all;
+
+}
+
+.right_log {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: #5677E7;
+    padding: 10px 40px;
+    color: white;
+    border-radius: 10px;
 }
 </style>

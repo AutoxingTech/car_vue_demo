@@ -10,42 +10,35 @@ export default defineComponent({
             }
 
             if (from.fullPath == '/starup') {
-                instance.PasswordControl = true
+                instance.passwordControl = true  //输入密码界面
             }
         });
     },
 });
 </script>
-
-
 <script setup lang="ts">
 import router from '../router';
 import { ref, reactive, onMounted } from 'vue'
 import settingUtil from '../js/settingUtil';
-import { OpenSetting } from '../js/android';
 import store from '../store';
 import { toast } from './Toast/Toast';
-import { AppMode, devurl, disurl, storage_key_url, storage_key_app_mode, storage_key_sn } from '../js/globalConfig';
+import { devurl, disurl, storage_key_url, storage_key_app_mode, storage_key_sn } from '../js/globalConfig';
 import SettingPassVue from './SettingPass.vue'
-
-
+import { OpenSetting } from '../js/android';
+import { Rlog } from '../js/Rlog';
 const useStore = store()
-function exitSetting() {
-    if (useStore.nextpage == 1) {
-        router.replace({
-            path: '../index'
-        })
-    } else if (useStore.nextpage == 2) {
-        //跳转setting
-        router.go(-1)
-    } else if (useStore.nextpage == 0) {
-        router.go(-1)
-    }
-}
-
-const PasswordControl = ref(true)
-const showTapApk = ref(false)
-const current_Set = ref(4)
+const showrestartApp = ref(false) //是否显示重启app
+const passwordControl = ref(true) //控制密码交互界面
+const showTapApk = ref(false)  //是否跳转建图APP
+const current_Set = ref(4)  //当前展示的左侧部分下标
+const hiddenSettings = reactive({
+    times: 0,
+    visible: false,//显示隐藏
+    mode: 0, //0广域 1本地
+    serv: 1, //0开发 1生产
+    sn: ""
+})
+//左侧循环列表
 const setList: any = [
     {
         id: 0,
@@ -78,6 +71,7 @@ const setList: any = [
         img2: new URL('../assets/img/setleft5nosel.png', import.meta.url),
     }
 ]
+//功能列表
 const modetype: any = reactive([{
     id: 1,
     name: 'setting.zdms',
@@ -106,38 +100,22 @@ const modetype: any = reactive([{
     img1: new URL('../assets/img/sys_4.png', import.meta.url),
     img2: new URL('../assets/img/sys_4.png', import.meta.url),
 
-}, {
+},
+{
     id: 5,
     name: 'starup.xtsz',
-    sel: true,
+    sel: false,
     img1: new URL('../assets/img/sys_5.png', import.meta.url),
     img2: new URL('../assets/img/sys_5.png', import.meta.url),
-}, {
+},
+{
     id: 6,
     name: 'setting.wlan',
-    sel: false,
+    sel: true,
     img1: new URL('../assets/img/sys_6.png', import.meta.url),
     img2: new URL('../assets/img/sys_6.png', import.meta.url),
 }])
-const TapApkControl = () => {
-    showTapApk.value = !showTapApk.value
-}
-const TapAPK = () => {
-    showTapApk.value = !showTapApk.value
-}
-const ModelClick = (e: number) => {
-    if (e == 3) {
-        console.log("重启")
-        settingUtil.restart()
-    }
-    if (e == 5) {
-        console.log("系统设置")
-        OpenSetting()
-    }
-}
-const hiddenPass = () => {
-    PasswordControl.value = false
-}
+
 onMounted(() => {
     let obj: any = localStorage.getItem("hiddenSettings")
     if (obj) {
@@ -147,34 +125,67 @@ onMounted(() => {
         hiddenSettings.sn = obj.sn;
     }
 })
-
-const hiddenSettings = reactive({
-    times: 0,
-    visible: false,//显示隐藏
-    mode: 0, //0广域 1本地
-    serv: 1, //0开发 1生产
-    sn: ""
-})
-
+//退出当前页面
+function exitSetting() {
+    if (useStore.nextpage == 1) {
+        router.replace({
+            path: '../index'
+        })
+    } else if (useStore.nextpage == 2) {
+        //跳转setting
+        router.go(-1)
+    } else if (useStore.nextpage == 0) {
+        router.go(-1)
+    }
+}
+//跳转建图app弹框控制
+function TapApkControl() {
+    showTapApk.value = !showTapApk.value
+}
+//重启和系统设置点击事件
+function ModelClick(e: any) {
+    if (e == 3) {
+        restartApkControl()
+    }
+    if (e == 5) {
+        if (modetype[4].sel == true) {
+            OpenSetting()
+        }
+    }
+    if (e == 6) {
+        router.push('./wifesetting')
+    }
+}
+//控制重启app确认弹框的显示和隐藏
+function restartApkControl() {
+    showrestartApp.value = !showrestartApp.value
+}
+//隐藏密码交互界面
+function hiddenPass() {
+    passwordControl.value = false
+}
+//**设置sn */
+//**设置网络模式 */
 function hiddenSettingsmode(mode: any) {
     hiddenSettings.mode = mode
 }
 function hiddenSettingsserv(serv: any) {
     hiddenSettings.serv = serv
 }
-
 function hiddenSetting() {
     hiddenSettings.times++
     if (hiddenSettings.times % 10 == 9) {
         hiddenSettings.visible = true
+        modetype[4].sel = true
     } else {
         hiddenSettings.visible = false
+        modetype[4].sel = false
     }
 }
 function hiddenSettingConfim() {
     if (hiddenSettings.mode == 1) {
         localStorage.setItem(storage_key_app_mode, "1")
-        console.log(storage_key_app_mode, "1")
+        Rlog(storage_key_app_mode, '1')
     } else {
         if (hiddenSettings.sn.length != 15) {
             toast.show("sn长度15")
@@ -182,59 +193,74 @@ function hiddenSettingConfim() {
         } else {
             localStorage.setItem(storage_key_sn, hiddenSettings.sn)
             localStorage.setItem(storage_key_app_mode, "0")
-            console.log(storage_key_app_mode, "0")
         }
     }
     if (hiddenSettings.serv == 0) {
         localStorage.setItem(storage_key_url, devurl)
-        console.log(storage_key_url, devurl)
+        Rlog(storage_key_url, devurl)
     } else {
         localStorage.setItem(storage_key_url, disurl)
-        console.log(storage_key_url, disurl)
+        Rlog(storage_key_url, disurl)
     }
     localStorage.setItem("hiddenSettings", JSON.stringify(hiddenSettings))
 
 }
-
-defineExpose({ useStore, PasswordControl });
+//打开日志
+function showLogs() {
+    useStore.$patch((state: any) => {
+        state.showLogs = true
+    })
+}
+defineExpose({ useStore, passwordControl });
 
 </script>
 
 <template>
-    <SettingPassVue :PasswordControl="PasswordControl" :defautType="1" @ficback="exitSetting" @passin="hiddenPass" />
+    <SettingPassVue :PasswordControl="passwordControl" :defautType="1" @ficback="exitSetting" @passin="hiddenPass" />
     <div class="all">
+        <div class="mask_tapapk" v-if="showrestartApp">
+            <div class="_makcontent">
+                <div class="tip_apk">
+                    {{ $t('setting.sfcqcjApp') }}
+                </div>
+                <div class="tip_meth">
+                    <div @click="restartApkControl"> {{ $t('setting.fou') }}</div>
+                    <div @click="settingUtil.restart()">{{ $t('setting.shi') }}</div>
+                </div>
+            </div>
+        </div>
         <div class="tip">
             <!-- <navbarVue :heights="'84'" /> -->
         </div>
         <div class="set_content">
             <div class="set_left">
-                <div class="set_font1">
-                    {{$t('setting.szgl')}}
+                <div class="set_font1" @click="showLogs">
+                    {{ $t('setting.szgl') }}
                 </div>
 
                 <div class="set_list">
-                    <div class="set_control" v-for="(item,index) in setList" :key="index">
-                        <div class="gip" v-if="current_Set==index"></div>
-                        <div :class="current_Set==index?'control_box':'control_box2'">
-                            <img :src="current_Set==index?item.img:item.img2">
-                            <div>{{$t(item.name)}}</div>
+                    <div class="set_control" v-for="(item, index) in setList" :key="index">
+                        <div class="gip" v-if="current_Set == index"></div>
+                        <div :class="current_Set == index ? 'control_box' : 'control_box2'">
+                            <img :src="current_Set == index ? item.img : item.img2">
+                            <div>{{ $t(item.name) }}</div>
                         </div>
                     </div>
                 </div>
-                <div class="exit_set" @click="exitSetting">{{$t('setting.tcsz')}}</div>
+                <div class="exit_set" @click="exitSetting">{{ $t('setting.tcsz') }}</div>
             </div>
 
             <div class="set_right">
                 <div>
                     <div>
                         <div class="sys_top">
-                            <div class="sys_bj font4">{{$t('setting.bjgn')}}</div>
+                            <div class="sys_bj font4">{{ $t('setting.bjgn') }}</div>
                             <div class="sys_modetype">
                                 <!-- :class="item.sel?'sys_mode_one2':'sys_mode_one'"  -->
-                                <div v-for="(item,index) in modetype" :key="index"
-                                    :class="item.sel?'sys_mode_one2':'sys_mode_one'" @click="ModelClick(item.id)">
+                                <div v-for="(item, index) in modetype" :key="index"
+                                    :class="item.sel ? 'sys_mode_one2' : 'sys_mode_one'" @click="ModelClick(item.id)">
                                     <img :src="item.img1" style="width:38px;height: 38px;margin-bottom: 13px;">
-                                    <div :class="item.sel?'f1':'f2'">{{$t(item.name)}}</div>
+                                    <div :class="item.sel ? 'f1' : 'f2'">{{ $t(item.name) }}</div>
                                 </div>
                             </div>
                         </div>
@@ -242,33 +268,37 @@ defineExpose({ useStore, PasswordControl });
                     <div class="sys_setting">
                         <div>
                             <div>
-                                <span class="sys_span1 font4">{{$t('setting.dyysz')}}</span>
+                                <span class="sys_span1 font4">{{ $t('setting.dyysz') }}</span>
                             </div>
-                            <div>{{$t('setting.qhyy')}}</div>
+                            <div>{{ $t('setting.qhyy') }}</div>
                         </div>
                     </div>
                     <div class="sys_setting">
                         <div>
                             <div>
-                                <span class="sys_span1 font4">{{$t('setting.glymm')}}</span>
+                                <span class="sys_span1 font4">{{ $t('setting.glymm') }}</span>
                             </div>
-                            <div>{{$t('setting.xgmm')}}</div>
+                            <div>{{ $t('setting.xgmm') }}</div>
                         </div>
                     </div>
                     <div v-if="hiddenSettings.visible" class="sys_user_setting" style="border-radius: 13px 13px 0 0;">
                         <div @click="hiddenSettingsmode(1)"
-                            :class="hiddenSettings.mode==1?'sys_user_setting_sel':'sys_user_setting_unsel'">本地模式</div>
+                            :class="hiddenSettings.mode == 1 ? 'sys_user_setting_sel' : 'sys_user_setting_unsel'">本地模式
+                        </div>
                         <div @click="hiddenSettingsmode(0)"
-                            :class="hiddenSettings.mode==0?'sys_user_setting_sel':'sys_user_setting_unsel'">广域网模式</div>
+                            :class="hiddenSettings.mode == 0 ? 'sys_user_setting_sel' : 'sys_user_setting_unsel'">广域网模式
+                        </div>
                         <input placeholder="SN" v-model="hiddenSettings.sn"
                             style="padding-left: 24px;margin-top: 14px;border-radius: 8px;margin-left: 12px;height: 38px;width: 180px;font-weight: bold;font-size: 18px;color: cornflowerblue;" />
                     </div>
                     <div v-if="hiddenSettings.visible" class="sys_user_setting"
                         style="margin-top: 1px;border-radius:0 0 13px 13px;">
                         <div @click="hiddenSettingsserv(0)"
-                            :class="hiddenSettings.serv==0?'sys_user_setting_sel':'sys_user_setting_unsel'">测试环境</div>
+                            :class="hiddenSettings.serv == 0 ? 'sys_user_setting_sel' : 'sys_user_setting_unsel'">测试环境
+                        </div>
                         <div @click="hiddenSettingsserv(1)"
-                            :class="hiddenSettings.serv==1?'sys_user_setting_sel':'sys_user_setting_unsel'">生产环境</div>
+                            :class="hiddenSettings.serv == 1 ? 'sys_user_setting_sel' : 'sys_user_setting_unsel'">生产环境
+                        </div>
                         <div style="flex:1"></div>
                         <div @click="hiddenSettingConfim()" class="sys_user_setting_sel"
                             style="margin-right: 32px;background-color: #608FFA;">确定</div>
@@ -282,39 +312,39 @@ defineExpose({ useStore, PasswordControl });
                         </div>
                     </div> -->
                     <div class="sys_message">
-                        <div @click="hiddenSetting()" class="sys_message_top font4">{{$t('setting.xtxx')}}</div>
+                        <div @click="hiddenSetting()" class="sys_message_top font4">{{ $t('setting.xtxx') }}</div>
                         <div class="sys_onemessage">
-                            <div>{{$t('setting.jqrlx')}}</div>
-                            <div>{{$t('setting.zwsj')}}</div>
+                            <div>{{ $t('setting.jqrlx') }}</div>
+                            <div>{{ $t('setting.zwsj') }}</div>
                         </div>
 
                         <div class="sys_onemessage">
-                            <div>{{$t('setting.jqrsn')}}</div>
-                            <div>{{$t('setting.zwsj')}}</div>
+                            <div>{{ $t('setting.jqrsn') }}</div>
+                            <div>{{ $t('setting.zwsj') }}</div>
                         </div>
 
                         <div class="sys_onemessage">
-                            <div>{{$t('setting.jqrbb')}}</div>
-                            <div>{{$t('setting.zwsj')}}</div>
+                            <div>{{ $t('setting.jqrbb') }}</div>
+                            <div>{{ $t('setting.zwsj') }}</div>
                         </div>
                         <div class="sys_onemessage">
-                            <div>{{$t('setting.jqrdpbb')}}</div>
-                            <div>{{$t('setting.zwsj')}}</div>
+                            <div>{{ $t('setting.jqrdpbb') }}</div>
+                            <div>{{ $t('setting.zwsj') }}</div>
                         </div>
                         <div class="sys_onemessage noborder">
-                            <div>{{$t('setting.jqrbssj')}}</div>
-                            <div>{{$t('setting.zwsj')}}</div>
+                            <div>{{ $t('setting.jqrbssj') }}</div>
+                            <div>{{ $t('setting.zwsj') }}</div>
                         </div>
                     </div>
                     <div class="emptyline"></div>
                     <div class="mask_tapapk" v-if="showTapApk">
                         <div class="_makcontent">
                             <div class="tip_apk">
-                                {{$t('setting.sftz')}}
+                                {{ $t('setting.sftz') }}
                             </div>
                             <div class="tip_meth">
-                                <div @click="TapApkControl">{{$t('setting.fou')}}</div>
-                                <div @click="TapAPK">{{$t('setting.shi')}}</div>
+                                <div @click="TapApkControl">{{ $t('setting.fou') }}</div>
+                                <div @click="TapApkControl">{{ $t('setting.shi') }}</div>
                             </div>
                         </div>
                     </div>
@@ -563,10 +593,11 @@ defineExpose({ useStore, PasswordControl });
     height: 100%;
     position: absolute;
     right: 180px;
-    line-height: 86px;
     font-size: 16px;
     font-weight: bold;
     color: #83A9FF;
+    left: -80px;
+    white-space: nowrap;
 }
 
 .sys_setting>div>div:nth-child(1) {
@@ -575,8 +606,9 @@ defineExpose({ useStore, PasswordControl });
 }
 
 .sys_setting>div>div:nth-child(2) {
-    width: 120px;
-    height: 40px;
+    min-width: 120px;
+    padding: 0 25px;
+    box-sizing: border-box;
     background: #F1F2F6;
     border-radius: 13px;
     font-size: 16px;
@@ -644,6 +676,7 @@ defineExpose({ useStore, PasswordControl });
     left: 0;
     right: 0;
     background-color: rgba(0, 0, 0, 0.5);
+    z-index: 99;
 }
 
 ._makcontent {
@@ -655,7 +688,7 @@ defineExpose({ useStore, PasswordControl });
     top: 50%;
     left: 50%;
     margin-left: -267.5px;
-    margin-top: -169px;
+    margin-top: -118px;
 
 }
 

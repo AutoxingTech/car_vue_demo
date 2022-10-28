@@ -1,14 +1,15 @@
 import router from '../router';
-import { reactive } from "vue";
+import { reactive, ref } from "vue";
 import store from "../store";
 import settingUtil, { ControlLoading } from './settingUtil'
 import { appId, appSecret, robotId, appMode, AXRobot, EmergencyType, MotionType } from "../js/globalConfig";
 import { toast } from "../components/Toast/Toast";
 import { CrashStatus } from '../js/globalData'
-
+import { Rlog, Levels, Modetags } from './Rlog';
 export const MinLocQuality = 70  //定位状态 0～100 70以上可用
 
 export const Lowest_power = 19  //低电量
+export const charing: any = ref('')  //记录充电状态 (用于首页进行监听)
 
 var axRobot: any = null
 var taskStartTimeout: any = null
@@ -52,7 +53,7 @@ const goTaskUI = (data: any) => {
     taskInfo.runType = 0
     taskId = data.taskId
     axRobot.getCurrentTask().then((res: any) => {
-        console.log("getCurrentTask:", res)
+        Rlog(res, "getCurrentTask:")
         taskInfo.runType = res.runType
         //构造托盘数据
         let len = undefined
@@ -99,8 +100,12 @@ const goTaskUI = (data: any) => {
         } else {
             taskInfo.backPt.name = null
         }
-        console.log("goTaskUI_TaskInfo", taskInfo)
+        Rlog(taskInfo, "goTaskUI_TaskInfo")
     }).then(() => {
+        //播放背景音乐
+        if (taskInfo.runType == 20 || taskInfo.runType == 21 || taskInfo.runType == 22 || taskInfo.runType == 23) {
+            settingUtil.audioPlay(settingUtil.getbackgroundSong())
+        }
         clearTimeout(taskStartTimeout)
         ControlLoading(false)
         if (store().isModify) {
@@ -108,9 +113,20 @@ const goTaskUI = (data: any) => {
                 state.isModify = false
             })
         }
-        router.push({
-            path: '/task'
-        })
+        if (router.currentRoute.value.path == "/crashstop" && store().tapType == 1) {
+            //如果是从任务中急停  并且发充电桩或者待命点的任务
+            store().$patch((state: any) => {
+                state.tapType = 0
+                router.back()
+            })
+        } else {
+            //正常发任务
+            if (router.currentRoute.value.path != '/task') {
+                router.push({
+                    path: '/task'
+                })
+            }
+        }
     })
 }
 
@@ -121,7 +137,7 @@ const callBack = (tag: number) => {
     if (UICallBack) {
         UICallBack(tag)
     } else {
-        console.log("任务UI未初始化完成")
+        Rlog("任务UI未初始化完成")
     }
 }
 
@@ -132,7 +148,7 @@ const actExe: any = {
             let name = data.target.name
             for (let pt of taskInfo.list) {
                 if (pt.name == name) { //todo 需要改id
-                    console.log(name, "出发")
+                    Rlog(name, "出发")
                     pt.status = 1
                 }
             }
@@ -161,7 +177,7 @@ const actExe: any = {
             let name = data.current.name
             for (let pt of taskInfo.pallet) {
                 if (pt.name == name) { //todo 需要改id
-                    console.log(name, "达到")
+                    Rlog(name, "达到")
                     pt.status = 2
                 }
             }
@@ -196,20 +212,32 @@ const actExe: any = {
 
     actType1001(data: any) {
         //任务完成，，可以返回了
+        settingUtil.audioStop()  //结束播放
         callBack(1001)
-    }
+    },
+
+    actType1002(data: any) {
+        if (data.isWheelOverload == true) { //过载
+            settingUtil.AbnormalControl(data.isTakeElevator == true ? 4 : 3)
+        } else { //过载清楚了
+            return robotUtil.motionForAuto().then(() => {
+                return robotUtil.restartTask()
+            }).then(() => {
+                settingUtil.AbnormalControl(0)
+            })
+        }
+    },
 }
 
 //actType:14当前要去的站点 16到达 1000开始 1001完成
 const onTaskChanged = (data: any) => {
-    console.log("on__Task__Changed:", data)
+    Rlog(Modetags.TaskState, "____________", data)
     let actType = data.actType
     let info = data.data
     if (actExe["actType" + actType]) {
         actExe["actType" + actType](info)
     }
 }
-
 const onStateChanged = (data: any) => {
     delete data.timestamp
     delete data.x
@@ -217,7 +245,7 @@ const onStateChanged = (data: any) => {
     delete data.yaw
     delete data.speed
     if (JSON.stringify(state) != JSON.stringify(data)) {
-        console.log("on____________State__Changed:", data)
+        Rlog(Modetags.RealState, "____________", data,)
         store().$patch((state: any) => {
             let robotstatus = JSON.parse(JSON.stringify(data))
             for (let i in robotstatus) {
@@ -226,6 +254,18 @@ const onStateChanged = (data: any) => {
             state.vers = data.vers.hwVer + ' / ' + data.vers.softVer
         })
         state = data
+
+        if (store().showAbnormal == 2 && data.isCharging == true) {
+            settingUtil.AbnormalControl(0)
+            robotUtil.motionForAuto()
+            robotUtil.stopPlayAudio()
+        }
+
+        // if (charing.value != data.isCharging) {
+        //     //充电状态发生变化
+        //     charing.value = data.isCharging
+        // }
+
         if (isEmergencyStop != data.isEmergencyStop) {
             isEmergencyStop = data.isEmergencyStop
             if (isEmergencyStop == true && router.currentRoute.value.path != "/starup" && router.currentRoute.value.path != "/ficsetting") {
@@ -248,10 +288,27 @@ const onStateChanged = (data: any) => {
         if (isError == false && data.isTasking && data.moveState == "failed") {
             isError = true
             robotUtil.cancelTask().then(() => {
-                settingUtil.AbnormalControl(1)
+                let abnormalType = 1
+                for (let err of data.errors) {
+                    if (err == 100 || err == 101) { //对撞失败
+                        abnormalType = 2
+                        robotUtil.motionForManual()
+                        break;
+                    }
+                }
+                settingUtil.AbnormalControl(abnormalType)
             })
-            console.log("===============moveState failed=================")
+            Rlog("===============moveState failed=================")
         }
+
+        for (let err of data.errors) {
+            if (err == 20009) { //电动门异常
+                robotUtil.cancelTask()
+                settingUtil.AbnormalControl(1)
+                break;
+            }
+        }
+
         if (data.battery <= Lowest_power && router.currentRoute.value.path != '/task' && router.currentRoute.value.path != '/starup' && router.currentRoute.value.path != '/crashstop' && router.currentRoute.value.path != '/ficsetting' && data.isCharging == false) {
             let NowTime = new Date().getTime()
             if (gocharTime == '' || (Math.abs(NowTime - gocharTime) / 1000) > 60) {
@@ -264,26 +321,26 @@ const onStateChanged = (data: any) => {
 
 //不处理异常
 const commonR = (promise: any, name: string, reqObj = {}, reqObj2 = {}) => {
-    console.log(name, "__Req:::", reqObj)
+    Rlog(Modetags.API, name, "__Req:::", reqObj)
     return promise.then((res: any) => {
-        console.log(name, "__res>>>", res)
+        Rlog(Modetags.API, name, "__res>>>", res)
         return Promise.resolve(res)
     }).catch((err: any) => {
-        console.log(name, "__ERR###", err)
+        Rlog(Levels.error, Modetags.API, name, "__ERR###", err)
         return Promise.reject(err)
     })
 }
 
 //处理异常
 const commonP = (promise: any, name: string, reqObj = {}, reqObj2 = {}) => {
-    console.log(name, "__Req:::", reqObj, reqObj2)
+    Rlog(Modetags.API, name, "__Req:::", reqObj)
     return promise.then((res: any) => {
-        console.log(name, "__res>>>", res)
+        Rlog(Modetags.API, name, "__res>>>", res)
         return Promise.resolve(res)
     }).catch((err: any) => {
         ControlLoading(false)
         settingUtil.AbnormalControl(1)
-        console.log(name, "__ERR###", err)
+        Rlog(Levels.error, Modetags.API, name, "__ERR###", err)
         return new Promise(() => { })
     })
 }
@@ -292,6 +349,7 @@ const commonP = (promise: any, name: string, reqObj = {}, reqObj2 = {}) => {
 export const robotUtil = {
 
     init() {
+        Rlog({ appId, appSecret, appMode }, "init")
         axRobot = new AXRobot(appId, appSecret, appMode);
         return commonR(axRobot.init(), "axRobot.init")
     },
@@ -316,6 +374,14 @@ export const robotUtil = {
         return axRobot.getVersion()
     },
 
+    isTasking() {
+        if (state && state.isTasking) {
+            return true
+        } else {
+            return false
+        }
+    },
+
     getPoiList(reqObj: any) {
         return commonR(axRobot.getPoiList(reqObj), "axRobot.getPoiList", reqObj)
     },
@@ -323,7 +389,16 @@ export const robotUtil = {
     getEffectiveAreaList(reqObj: any) {
         return commonR(axRobot.getEffectiveAreaList(reqObj), "axRobot.getEffectiveAreaList", reqObj)
     },
-
+    //是否进行业务绑定
+    getBusinessId() {
+        return commonR(axRobot.getBusinessId(), "axRobot.getBusinessId")
+    },
+    setLanguage_R(reqObj: any) {
+        return commonR(axRobot.setLanguage(reqObj), "axRobot.setLanguage", reqObj)
+    },
+    setLanguage_P(reqObj: any) {
+        return commonP(axRobot.setLanguage(reqObj), "axRobot.setLanguage", reqObj)
+    },
     getState_P() {
         return commonR(axRobot.getState(), "axRobot.getState")
     },
@@ -382,7 +457,7 @@ export const robotUtil = {
             if (res == 1) {
                 clearTimeout(taskStartTimeout)
                 taskStartTimeout = setTimeout(() => {
-                    console.log("任务发送超时")
+                    Rlog("任务发送超时")
                     ControlLoading(false)
                 }, 1000 * 10);
                 // commonP(axRobot.createTask(task), "axRobot.startTask", task).then((taskId:any) => {
@@ -399,9 +474,22 @@ export const robotUtil = {
         })
     },
 
-
     executeTask() {
         return commonP(axRobot.executeTask(taskId), "axRobot.executeTask", taskId)
+    },
+
+    restartTask() {
+        return commonP(axRobot.restartTask(taskId), "axRobot.restartTask", taskId)
+    },
+
+    removeWheelOverload() {
+        return commonP(axRobot.removeWheelOverload(), "axRobot.removeWheelOverload")
+    },
+
+    exportOpreationLogger(level: string, modelTag: string, logdata: any, msg: string) {
+        if (axRobot != null && robotId) {
+            axRobot.exportOpreationLogger(level, robotId, modelTag, logdata, msg)
+        }
     },
 
     pauseTask() {
@@ -416,14 +504,18 @@ export const robotUtil = {
         return commonP(axRobot.continueTask(), "axRobot.continueTask")
     },
 
-    resumeMotion() {
-        return commonP(axRobot.resumeMotion(), "axRobot.resumeMotion")
+    // resumeMotion() {
+    //     return commonP(axRobot.resumeMotion(), "axRobot.resumeMotion")
+    // },
+    stopPlayAudio() {
+        commonP(axRobot.stopPlayAudio(), "axRobot.stopPlayAudio")
     },
 
     cancelTask() {
-        commonP(axRobot.stopPlayAudio(), "axRobot.stopPlayAudio")
+        this.stopPlayAudio()
         return commonP(axRobot.cancelTask(), "axRobot.cancelTask")
     },
+
 
     updateTask(arr: any) {
         return commonP(axRobot.updateTask(taskId, arr), "axRobot.updateTask", taskId, arr)
@@ -439,6 +531,10 @@ export const robotUtil = {
 
     getPoiById(reqObj: any) {
         return commonR(axRobot.getPoiById(reqObj), "axRobot.getPoiById", reqObj)
+    },
+
+    updateMap() {
+        return commonP(axRobot.updateMap(), "axRobot.updateMap")
     },
 
     cancelEmergencyStop() {

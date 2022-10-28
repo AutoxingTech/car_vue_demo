@@ -5,15 +5,15 @@ export default defineComponent({
         next((vm) => {
             const instance: any = vm;
             if (instance.userstore.isModify) {
-                console.log("取消任务，取消已完成的任务")
+                Rlog("取消任务，取消已完成的任务")
                 taskInfo.list.forEach((item: any, index: number) => {
                     if (item.status == 3) {
-                        instance.Multidelist.forEach((item2: any, index2: number) => {
+                        instance.multidelist.forEach((item2: any, index2: number) => {
                             if (item2.id == item.id) {
                                 let table = item2
                                 if (table.select == 1) {
                                     table.select = 0
-                                    instance.Multidelist.splice(index2, 1)
+                                    instance.multidelist.splice(index2, 1)
                                 }
                             }
                         });
@@ -32,39 +32,104 @@ export default defineComponent({
 </script>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, watch, onMounted } from 'vue'
 import 'swiper/css';
 import { Swiper, SwiperSlide } from 'swiper/vue';
 import draggable from 'vuedraggable'
-import { tables, poiMap } from '../../js/Datacollation';
-import { audioMode,ActionType } from "../../js/globalConfig"
+import { modedisplay, modelAudioMap, currentfloor } from '../../js/Datacollation';
+import { audioMode, ActionType } from "../../js/globalConfig"
+import { updateMap } from '../../js/globalData'
 import settingUtil from "../../js/settingUtil"
 import store from '../../store';
 import { robotUtil, taskInfo } from '../../js/robotUtil'
 import { toast } from '../Toast/Toast';
 import { useI18n } from 'vue-i18n'
+import { Rlog } from '../../js/Rlog';
 const { t } = useI18n()
-
 const userstore: any = store()
-const currentType = ref(1)
-const tabMessage: any = reactive(tables)[1] //快捷送餐数据   
-const floorlist1: any = tabMessage.floorlist //餐桌楼层
-const floorlist2 = tabMessage.floorlist2  //包间楼层
+const currentType = ref(1) //当前是餐桌还是包间
+const tabMessage: any = modedisplay[1] //快捷送餐数据   
+const multidelist: any = reactive([]) //多点送餐选择的列表
+const enabled = ref(true) //控制拖动
+const dragging = ref(false) //记录开始拖动
+const max_left = ref(false)   //餐桌楼层是否还可以向左滑动
+const max_right = ref(false)  //餐桌楼层是否还可以向右滑动
+const max_left1 = ref(false)  //包间楼层是否还可以向左滑动
+const max_right1 = ref(false) //包间楼层是否还可以向右滑动
 let curSwiper: any = null; //餐厅swiper的对象
 let curSwiper2: any = null; //包间swiper的对象
-const Multidelist: any = reactive([])
 
-const enabled = ref(true)
-const dragging = ref(false)
+onMounted(() => {
+    //餐桌floorlist添加滚动监听
+    var scrollDiv: any = document.getElementById('scroll1');
+    scrollDiv.addEventListener('scroll', function () {
+        if (scrollDiv.scrollLeft <= 10) {  //若滚动距离距离最左侧低于10 设置 max_left=true 已到达最左侧
+            if (max_left.value == false) { //防止重读设置同样值
+                max_left.value = true
+            }
+        } else {
+            if (max_left.value == true) { //若滚动距离距离最左侧超过10 设置 max_left=false 距离左侧还有一段距离
+                max_left.value = false
+            }
+        }
 
+        if (scrollDiv.scrollWidth - scrollDiv.offsetWidth - scrollDiv.scrollLeft <= 10) {   //scroll内置的距离 - 固定宽的长度 - 滚动的长度<10 即将达到右侧
+            if (max_right.value == false) {//防止重读设置同样值
+                max_right.value = true
+            }
+        } else {
+            if (max_right.value == true) { //scroll内置的距离 - 固定宽的长度 - 滚动的长度>0  //距离右侧还有一段距离
+                max_right.value = false
+            }
+        }
+    });
+
+    //包间floorlist添加滚动监听
+    var scrollDiv2: any = document.getElementById('scroll2');
+    scrollDiv2.addEventListener('scroll', function () {
+        if (scrollDiv2.scrollLeft <= 10) {
+            if (max_left1.value == false) {
+                max_left1.value = true
+            }
+        } else {
+            if (max_left1.value == true) {
+                max_left1.value = false
+            }
+        }
+        if (scrollDiv2.scrollWidth - scrollDiv2.offsetWidth - scrollDiv2.scrollLeft <= 10) {
+            if (max_right1.value == false) {
+                max_right1.value = true
+            }
+        } else {
+            if (max_right1.value == true) {
+                max_right1.value = false
+            }
+        }
+    });
+})
+//餐桌左右滚动一段距离
+function floor1contscroll(e: any) {
+    if (e == 1) {
+        let scrollDiv: any = document.getElementById('scroll1');
+        scrollDiv.scrollLeft -= 60
+    } else {
+        let scrollDiv: any = document.getElementById('scroll1');
+        scrollDiv.scrollLeft += 69
+    }
+}
+//包间左右滚动一段距离
+function floor2contscroll(e: any) {
+    if (e == 1) {
+        let scrollDiv: any = document.getElementById('scroll2');
+        scrollDiv.scrollLeft -= 60
+    } else {
+        let scrollDiv: any = document.getElementById('scroll2');
+        scrollDiv.scrollLeft += 69
+    }
+}
+//打印移动的目标
 function checkMove(e: any) {
-    console.log("Future index: " + e.draggedContext.futureIndex);
 }
-
-function showMorefloor() {
-    currentType.value == 1 ? tabMessage.floorlist1scroll = true : tabMessage.floorlist2scroll = true
-}
-
 //获取餐厅swiper对象方法
 function onSwiper(e: any) {
     curSwiper = e
@@ -73,12 +138,11 @@ function onSwiper(e: any) {
 function onSwiper2(e: any) {
     curSwiper2 = e
 }
-
 //楼层点击  swiper切换至对应位
 function floorTap(item: any) {
     if (currentType.value == 1) {
         for (let i in tabMessage.boardlist) {
-            if (tabMessage.boardlist[i][0].floor == item.name) {
+            if (tabMessage.boardlist[i][0].floor == item) {
                 tabMessage.swipertab = Number(i)
                 curSwiper.slideTo(Number(i));
                 break
@@ -86,7 +150,7 @@ function floorTap(item: any) {
         }
     } else {
         for (let i in tabMessage.boardlist2) {
-            if (tabMessage.boardlist2[i][0].floor == item.name) {
+            if (tabMessage.boardlist2[i][0].floor == item) {
                 tabMessage.swipertab2 = Number(i)
                 curSwiper2.slideTo(Number(i));
                 break
@@ -97,7 +161,7 @@ function floorTap(item: any) {
 }
 //将swiepr展示的楼层设为高亮
 function computeFloor() {
-    let ficlist = currentType.value == 1 ? floorlist1 : floorlist2
+    let ficlist = currentType.value == 1 ? tabMessage.floorlist : tabMessage.floorlist2
     let ficfloor = currentType.value == 1 ? tabMessage.boardlist[tabMessage.swipertab][0].floor : tabMessage.boardlist2[tabMessage.swipertab2][0].floor
     for (let i in ficlist) {
         if (ficlist[i].name == ficfloor) {
@@ -116,8 +180,6 @@ function swiperPrev() {
 function swiperNext() {
     currentType.value == 1 ? curSwiper.slideNext() : curSwiper2.slideNext()
 }
-
-
 //属于餐桌的swiper
 function onSlideChange(e: any) {
     tabMessage.swipertab = e.activeIndex
@@ -128,73 +190,70 @@ function onSlideChange2(e: any) {
     tabMessage.swipertab2 = e.activeIndex
     computeFloor()
 }
-
 //点击站点
 function pointTap(index: number, index2: number) {
     let boardlist = currentType.value == 1 ? tabMessage.boardlist : tabMessage.boardlist2
     let table = boardlist[index][index2]
     if (table.select == 1) {
         table.select = 0
-        Multidelist.forEach((item: any, index: any) => {
+        multidelist.forEach((item: any, index: any) => {
             if (table.id == item.id) {
-                Multidelist.splice(index, 1)
+                multidelist.splice(index, 1)
             }
         })
     } else {
-        if (Multidelist.length < 6) {
+        if (multidelist.length < 6) {
             table.select = 1
-            Multidelist.push(table)
+            multidelist.push(table)
         }
     }
 
 }
 function cleanMessage() {
-    while (Multidelist.length > 0) {
-        let s = Multidelist.pop()
+    while (multidelist.length > 0) {
+        let s = multidelist.pop()
         s.select = 0
     }
 }
-
-
 //站点语音
 function volumeculation(e: any) {
-    let currentcast = null
-    let broadcasts = poiMap[2 + ""]  //2==配送
-    if (broadcasts[e + ""] != undefined) {
-        currentcast = broadcasts[e + ""]
+    let audioObj = null
+    let multiAudioMap = modelAudioMap[2 + ""]  //2==配送
+    if (multiAudioMap[e + ""] != undefined) {
+        audioObj = multiAudioMap[e + ""]
     }
     let Fobj: any = {
         mode: audioMode,
-        audioId: "3111002",//您的餐到了
+        audioId: settingUtil.audioIdset('3111002'),//您的餐到了
         num: 1,
         volume: userstore.customSetting.sound.switchon ? userstore.customSetting.sound.voiceVolume : 0,
         interval: -1,
         duration: -1,
     }
-    if (currentcast) {
-        Fobj.url = currentcast.fileUrl
-        Fobj.interval = currentcast.ruleInterval
+    if (audioObj) {
+        Fobj.url = audioObj.fileUrl
+        Fobj.interval = audioObj.ruleInterval
         // 1 按播报次数  2按照播报时间
-        if (currentcast.ruleType == 1) {
-            Fobj.num = currentcast.ruleCount
-        } else if (currentcast.runType == 2) {
-            Fobj.duration = currentcast.ruleDuration
+        if (audioObj.ruleType == 1) {
+            Fobj.num = audioObj.ruleCount
+        } else if (audioObj.ruleType == 2) {
+            Fobj.duration = audioObj.ruleDuration
         }
     }
     return Fobj
 }
-
-
+//执行任务
 function goTask() {
     let pts = [];
-    for (let i = 0; i < Multidelist.length; i++) {
-        let poi = Multidelist[i]
+    for (let i = 0; i < multidelist.length; i++) {
+        let poi = multidelist[i]
         pts.push(
             {
                 x: poi.coordinate[0],
                 y: poi.coordinate[1],
                 yaw: poi.yaw,
                 areaId: poi.areaId,
+                dockingRadius: (poi.properties && poi.properties.dockingRadius) ? poi.properties.dockingRadius : 0.5,
                 //托盘
                 ext: {
                     name: poi.name,
@@ -215,13 +274,14 @@ function goTask() {
     if (pts.length > 0) {
         let standby = settingUtil.getStandbyStation()
         let backPt = {
-            type:standby.type,
+            type: standby.type,
             x: standby.coordinate[0],
             y: standby.coordinate[1],
             yaw: standby.yaw,
             areaId: standby.areaId,
+            dockingRadius: (standby.properties && standby.properties.dockingRadius) ? standby.properties.dockingRadius : 0.5,
             ext: {
-                name: "返航中",//standby.name,
+                name: t('setting.fhz'),//standby.name,
                 id: standby.id
             },
             stepActs: [
@@ -237,24 +297,12 @@ function goTask() {
                     type: ActionType.PlayAudio,//本地音频
                     data: {
                         mode: audioMode,
-                        audioId: "3111012",//"小舟要出发送餐了，请让一让"
+                        audioId: settingUtil.audioIdset('3111012'),//"小舟要出发送餐了，请让一让"
                         num: 1,
                         volume: userstore.customSetting.sound.switchon ? userstore.customSetting.sound.voiceVolume : 0,
                         interval: -1,
                         duration: -1,
                         channel: 1
-                    },
-                },
-                {
-                    type: ActionType.PlayAudio,//背景音乐
-                    data: {
-                        mode: audioMode,
-                        audioId: settingUtil.getbackgroundSong(),
-                        num: 999,
-                        volume: userstore.customSetting.sound.switchon ? userstore.customSetting.sound.voiceVolume : 0,
-                        interval: -1,
-                        duration: -1,
-                        channel: 2
                     },
                 },
                 {
@@ -280,7 +328,6 @@ function goTask() {
         toast.show(t('index.wxzzd'))
     }
 }
-
 //滚动到当前位置
 function setcurrent(i: number) {
     var element1 = document.getElementById("id" + (Number(i)))
@@ -288,76 +335,89 @@ function setcurrent(i: number) {
         element1.scrollIntoView({ block: 'center', inline: 'center', behavior: 'auto' })
     }
 }
-
 //初始化滚动条
 function initscroll() {
-    let ficlist = currentType.value == 1 ? floorlist1 : floorlist2
+    let ficlist = currentType.value == 1 ? tabMessage.floorlist : tabMessage.floorlist2
     for (let i in ficlist) {
         if (ficlist[i].sel) {
             setcurrent(Number(i))
         }
     }
 }
-
-defineExpose({ Multidelist, userstore, cleanMessage, initscroll });
+// 状态是否更新地图
+watch(() => updateMap.value, (newvalue: any, oldvalue: any) => {
+    cleanMessage()
+})
+//当前楼层是否发生变化
+watch(() => currentfloor.value, (newvalue: any, oldvalue: any) => {
+    floorTap(newvalue) //切换为当前楼层的swiper
+})
+defineExpose({ multidelist, userstore, cleanMessage, initscroll });
 </script>
-
 
 <template>
     <div class="multideliverycontent">
         <div class="multitop">
 
             <!-- 餐厅的楼层循环选择 begin-->
-            <div :class="floorlist1.length>0?'floor_content':'floor_content2'" v-if="currentType == 1">
-                <!-- <div class="floor_list"
-                    v-if="floorlist1.length <= 4 || (floorlist1.length > 4 && !tabMessage.floorlist1scroll)">
-                    <div :class="item.sel ? 'one_floor' : 'nosel_floor'" @click="floorTap(item)"
-                        v-for="(item, index) in floorlist1.slice(0, 4)" :key="index">{{ item.name }}</div>
-                </div> -->
-                <div class="floor_list2">
-                    <div :id="'id'+index" :class="item.sel ? 'one_floor' : 'nosel_floor'"
-                        v-for="(item, index) in floorlist1" @click="floorTap(item)" :key="index">{{ item.name }}</div>
+            <div :class="tabMessage.floorlist.length > 0 ? 'floor_content' : 'floor_content2'"
+                v-show="currentType == 1">
+                <div :class="max_left ? 'floorleft_per1' : 'floorleft_per2'" v-if="tabMessage.floorlist.length > 5"
+                    @click="floor1contscroll(1)">
+                    <img src="../../assets/img/floorl.png" style="width:13px;height: 21px;">
                 </div>
-                <!-- <div class="more" v-if="floorlist1.length > 4 && !tabMessage.floorlist1scroll" @click="showMorefloor()">
-                    更多</div> -->
+                <div class="floor_list2" v-if="tabMessage.floorlist.length > 0" id="scroll1">
+                    <div :id="'id' + index" :class="item.sel ? 'one_floor' : 'nosel_floor'"
+                        v-for="(item, index) in tabMessage.floorlist" @click="floorTap(item.name)" :key="index">{{
+                                item.name
+                        }}</div>
+                </div>
+                <div :class="max_right ? 'floorright_per1' : 'floorright_per2'" v-if="tabMessage.floorlist.length > 5"
+                    @click="floor1contscroll(2)">
+                    <img src="../../assets/img/floorr.png" style="width:13px;height: 21px;">
+                </div>
             </div>
             <!-- 餐厅的楼层循环选择 end-->
 
             <!-- 包间的楼层循环选择 begin-->
-            <div :class="floorlist2.length>0?'floor_content':'floor_content2'" v-if="currentType == 2">
-                <!-- <div class="floor_list"
-                    v-if="floorlist2.length <= 4 || (floorlist2.length > 4 && !tabMessage.floorlist2scroll)">
-                    <div :class="item.sel ? 'one_floor' : 'nosel_floor'" @click="floorTap(item)"
-                        v-for="(item, index) in floorlist2.slice(0, 4)" :key="index">{{ item.name }}</div>
-                </div> -->
-                <div class="floor_list2">
-                    <div :id="'id'+index" :class="item.sel ? 'one_floor' : 'nosel_floor'"
-                        v-for="(item, index) in floorlist2" @click="floorTap(item)" :key="index">{{ item.name }}</div>
+            <div :class="tabMessage.floorlist2.length > 0 ? 'floor_content' : 'floor_content2'"
+                v-show="currentType == 2">
+                <div :class="max_left1 ? 'floorleft_per1' : 'floorleft_per2'" v-if="tabMessage.floorlist2.length > 5"
+                    @click="floor2contscroll(1)">
+                    <img src="../../assets/img/floorl.png" style="width:13px;height: 21px;">
                 </div>
-                <!-- <div class="more" v-if="floorlist2.length > 4 && !tabMessage.floorlist2scroll" @click="showMorefloor()">
-                    更多</div> -->
+                <div class="floor_list2" id="scroll2">
+                    <div :id="'id' + index" :class="item.sel ? 'one_floor' : 'nosel_floor'"
+                        v-for="(item, index) in tabMessage.floorlist2" @click="floorTap(item.name)" :key="index">{{
+                                item.name
+                        }}</div>
+                </div>
+                <div :class="max_right1 ? 'floorright_per1' : 'floorright_per2'" v-if="tabMessage.floorlist2.length > 5"
+                    @click="floor2contscroll(2)">
+                    <img src="../../assets/img/floorr.png" style="width:13px;height: 21px;">
+                </div>
             </div>
             <!-- 包间的楼层循环选择 end-->
 
 
             <div class="sel_type">
                 <div @click="currentType = 1" :class="currentType == 1 ? 'left_content_in' : 'left_content_out'">
-                    {{$t('index.xcz')}}
+                    {{ $t('index.xcz') }}
                 </div>
                 <div @click="currentType = 2" :class="currentType == 2 ? 'right_content_in' : 'right_content_out'">
-                    {{$t('index.xbj')}}
+                    {{ $t('index.xbj') }}
                 </div>
             </div>
         </div>
         <!--列表 -->
         <div class="mu_point_list">
             <div class="left_pre" style="margin-top: -12px;">
-                <span @click="swiperPrev" v-if="currentType==1&&floorlist1.length>0"
-                    :style="tabMessage.swipertab==0?'border-right-color: #C6C6C6 !important;':'border-right-color: #83A9FF !important;'"
+                <span @click="swiperPrev" v-if="currentType == 1 && tabMessage.floorlist.length > 0"
+                    :style="tabMessage.swipertab == 0 ? 'border-right-color: #C6C6C6 !important;' : 'border-right-color: #83A9FF !important;'"
                     class="swiper-button-prev"></span>
 
-                <span @click="swiperPrev" v-if="currentType==2&&floorlist2.length>0"
-                    :style="tabMessage.swipertab2==0?'border-right-color: #C6C6C6 !important;':'border-right-color: #83A9FF !important;'"
+                <span @click="swiperPrev" v-if="currentType == 2 && tabMessage.floorlist2.length > 0"
+                    :style="tabMessage.swipertab2 == 0 ? 'border-right-color: #C6C6C6 !important;' : 'border-right-color: #83A9FF !important;'"
                     class="swiper-button-prev"></span>
             </div>
             <!-- 餐桌点位选择 start-->
@@ -393,12 +453,12 @@ defineExpose({ Multidelist, userstore, cleanMessage, initscroll });
             </div>
             <!-- 包间点位选择 end-->
             <div class="right_pre" style="margin-top: -12px;">
-                <span @click="swiperNext" v-if="currentType==1&&floorlist1.length>0"
-                    :style="tabMessage.swipertab==tabMessage.boardlist.length-1?'border-left-color: #C6C6C6 !important;':'border-left-color: #83A9FF !important;'"
+                <span @click="swiperNext" v-if="currentType == 1 && tabMessage.floorlist.length > 0"
+                    :style="tabMessage.swipertab == tabMessage.boardlist.length - 1 ? 'border-left-color: #C6C6C6 !important;' : 'border-left-color: #83A9FF !important;'"
                     class="swiper-button-next"></span>
 
-                <span @click="swiperNext" v-if="currentType==2&&floorlist2.length>0"
-                    :style="tabMessage.swipertab2==tabMessage.boardlist2.length-1?'border-left-color: #C6C6C6 !important;':'border-left-color: #83A9FF !important;'"
+                <span @click="swiperNext" v-if="currentType == 2 && tabMessage.floorlist2.length > 0"
+                    :style="tabMessage.swipertab2 == tabMessage.boardlist2.length - 1 ? 'border-left-color: #C6C6C6 !important;' : 'border-left-color: #83A9FF !important;'"
                     class="swiper-button-next"></span>
             </div>
         </div>
@@ -421,11 +481,11 @@ defineExpose({ Multidelist, userstore, cleanMessage, initscroll });
 
 
                     <div class=" draf_cont" style="display:flex;align-items: center;">
-                        <div v-for="(item, index) in Multidelist" :key="index"
+                        <div v-for="(item, index) in multidelist" :key="index"
                             style="display:flex;align-items: center;">
                             <div class="one_drag"></div>
                             <div style="width:30px;height: 30px;display: flex;align-items: center;"
-                                v-if="index < Multidelist.length - 1">
+                                v-if="index < multidelist.length - 1">
                                 <img style="height:100%;width:100%" src="../../assets/img/mulright.png">
                             </div>
                         </div>
@@ -433,8 +493,8 @@ defineExpose({ Multidelist, userstore, cleanMessage, initscroll });
 
 
                     <div style="position:absolute;top: 0;right: 0;left: 0;bottom: 0;">
-                        <draggable :list="Multidelist" :disabled="!enabled" class="draf_cont" ghost-class="ghost"
-                            :move="checkMove" @start="dragging = true" itemKey="Multidelist.id" @end="dragging = false">
+                        <draggable :list="multidelist" :disabled="!enabled" class="draf_cont" ghost-class="ghost"
+                            :move="checkMove" @start="dragging = true" itemKey="multidelist.id" @end="dragging = false">
                             <template #item="{ element }">
                                 <div style="display:flex" :class="{ 'not-draggable': !enabled }">
                                     <div class="one_drag">{{ element.name }}</div>
@@ -446,17 +506,16 @@ defineExpose({ Multidelist, userstore, cleanMessage, initscroll });
 
 
                 </div>
-                <div class="clean_cont" @click="cleanMessage">{{$t('index.qk')}}</div>
+                <div class="clean_cont" @click="cleanMessage">{{ $t('index.qk') }}</div>
             </div>
             <div class="mu_sel_right font1" @click="goTask">
-                <span v-if="userstore.isModify">{{$t('index.xgrw')}}</span>
-                <span v-else>{{$t('index.ljcf')}}</span>
+                <span v-if="userstore.isModify">{{ $t('index.xgrw') }}</span>
+                <span v-else>{{ $t('index.ljcf') }}</span>
             </div>
         </div>
 
     </div>
 </template>
-
 
 <style scoped>
 .multideliverycontent {
@@ -543,10 +602,13 @@ defineExpose({ Multidelist, userstore, cleanMessage, initscroll });
     box-shadow: 0px 0px 4px #83A9FF;
     border-radius: 13px;
     text-align: center;
-    line-height: 104.6px;
+    line-height: 96px;
     font-weight: bold;
     color: #FFFFFF;
     box-sizing: border-box;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .mu_one_Point2 {
@@ -557,10 +619,13 @@ defineExpose({ Multidelist, userstore, cleanMessage, initscroll });
     margin-top: 28.8px;
     border-radius: 13px;
     text-align: center;
-    line-height: 104.6px;
+    line-height: 96px;
     font-weight: bold;
     color: #666666;
     box-sizing: border-box;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .draf_cont {
@@ -604,13 +669,17 @@ defineExpose({ Multidelist, userstore, cleanMessage, initscroll });
 }
 
 /* //公共样式 */
+
 .floor_content {
     height: 50px;
     background: #E1E2E3;
     border-radius: 13px;
     display: flex;
     align-items: center;
-    padding: 0 23px 0 16px;
+    padding-left: 0 11px 0 11px;
+    box-sizing: border-box;
+    border-radius: 13px;
+    overflow: hidden;
 }
 
 .floor_list {
@@ -625,12 +694,15 @@ defineExpose({ Multidelist, userstore, cleanMessage, initscroll });
 }
 
 .floor_list2 {
-    max-width: 278px;
     /* max-width: 332px; */
+    max-width: 346px;
     height: 36px;
     overflow-x: scroll;
     display: -webkit-box;
     white-space: nowrap;
+    padding: 0 11px 0 11px;
+    box-sizing: border-box;
+
 }
 
 .floor_list2>div:last-child {
@@ -652,7 +724,7 @@ defineExpose({ Multidelist, userstore, cleanMessage, initscroll });
     color: #FFFFFF;
     text-align: center;
     line-height: 36px;
-    margin-right: 22px;
+    margin-right: 15px;
 
 }
 
@@ -837,6 +909,42 @@ defineExpose({ Multidelist, userstore, cleanMessage, initscroll });
     border-radius: 50%;
     margin-right: 13px;
     box-sizing: border-box;
+}
+
+.floorleft_per1 {
+    width: 31px;
+    height: 100%;
+    background-color: #B5B5B5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.floorleft_per2 {
+    width: 31px;
+    height: 100%;
+    background-color: #FE6C5D;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.floorright_per1 {
+    width: 31px;
+    height: 100%;
+    background-color: #B5B5B5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.floorright_per2 {
+    width: 31px;
+    height: 100%;
+    background-color: #FE6C5D;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* 公共样式 */

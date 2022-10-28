@@ -14,7 +14,6 @@ const Canle = () => {
     emits("cancle-pallent");
 }
 const Enterpallent = () => {
-    console.log(pallentList)
     const list: any = []
     let has = false
     pallentList.forEach((item: any) => {
@@ -92,7 +91,6 @@ function Numtotal() {
             total += Number(item.num)
         }
     });
-    console.log(total)
     return total
 }
 
@@ -110,22 +108,22 @@ function Numtotal() {
     <div class="pallent_cont" v-if="showPallent">
         <div class="pallent_center">
             <div class="change_cont font6">
-                {{$t('setting.tpsz')}}
+                {{ $t('setting.tpsz') }}
             </div>
             <div class="pallent_list">
-                <div v-for="(item,index) in pallentList" :key="index">
-                    <div class="p_top_let">{{$t(item.name)}}</div>
+                <div v-for="(item, index) in pallentList" :key="index">
+                    <div class="p_top_let">{{ $t(item.name) }}</div>
                     <div class="p_top_right">
-                        <img v-if="item.num==0" src="../../../assets/img/selout.png" />
+                        <img v-if="item.num == 0" src="../../../assets/img/selout.png" />
                         <img v-else src="../../../assets/img/language1.png" />
 
                         <!-- <img :src="item.num!=0?'/src/assets/img/language1.png':'/src/assets/img/selout.png'" /> -->
                     </div>
-                    <div class="p_bottom_left">{{$t('setting.ddslsz')}}</div>
+                    <div class="p_bottom_left">{{ $t('setting.ddslsz') }}</div>
                     <div class="p_bottom_right">
                         <div class="place_cont">
-                            <input type="number" class="placeinput" v-model="item.num" @blur="blurNumber(item,index)"
-                                @input="setNum($event,index)">
+                            <input type="number" class="placeinput" v-model="item.num" @blur="blurNumber(item, index)"
+                                @input="setNum($event, index)">
                         </div>
                         <span class="num">cm</span>
                     </div>
@@ -133,8 +131,8 @@ function Numtotal() {
             </div>
 
             <div class="pallent_meth font7">
-                <div @click="Canle">{{$t('index.qx')}}</div>
-                <div @click="Enterpallent">{{$t('index.qd')}}</div>
+                <div @click="Canle">{{ $t('index.qx') }}</div>
+                <div @click="Enterpallent">{{ $t('index.qd') }}</div>
             </div>
         </div>
     </div>

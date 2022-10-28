@@ -3,6 +3,7 @@ import { Axios } from "axios"
 import { globalData } from "../js/globalData"
 import { ControlLoading } from '../js/settingUtil'
 import settingUtil from "../js/settingUtil"
+import { Rlog, Levels } from './Rlog';
 
 const instance = new Axios({
     baseURL: baseUrl,
@@ -12,11 +13,11 @@ var TOKEN = ""
 
 export function setToken(token: string) {
     TOKEN = token
-    console.log(token)
+    Rlog(token, 'token')
 }
 
 function request(path: string, data: any = {}, method: string = "POST", commonfail: boolean = true, retry: number = 2, showloaddding = false,) {
-    console.log("接口请求1:", path, method, data)
+    Rlog(path, method, data, "接口请求1:")
     let headers: any = {
         "X-Token": TOKEN,
         "Content-Type": "application/x-www-form-urlencoded"
@@ -45,7 +46,7 @@ function request(path: string, data: any = {}, method: string = "POST", commonfa
                         }
                         if (responeData.status == 200) {
                             ControlLoading(false)
-                            console.log("接口内容", responeData.data)
+                            Rlog(responeData.data, "接口内容")
                             resolve(responeData.data)
                         } else {
                             if (responeData.message && responeData.message.length > 0) {
@@ -71,12 +72,12 @@ function request(path: string, data: any = {}, method: string = "POST", commonfa
         reqfail = (err: any) => {
             retry = retry - 1
             if (retry > 0) {
-                console.log("重试", retry, err, path, method)
+                Rlog(Levels.error, retry, err, path, method, "重试")
                 request()
             } else {
                 if (commonfail == true) {
                     //todo 调用通用错误处理
-                    console.log("异常内容", err)
+                    Rlog(Levels.error, err, "requestError")
                     settingUtil.AbnormalControl(1)
                     return new Promise(() => { })
                 } else {
@@ -121,7 +122,6 @@ export const okRequest = {
      * extInfo //备用}
      */
     upload_setting(data: object) {
-        console.log(data, "param")
         return request("/robot_soft/save", JSON.stringify(data), "post", false).catch((err) => {
             return new Promise(() => { })
         })
@@ -131,7 +131,7 @@ export const okRequest = {
     * 巡游列表信息
     */
     CuriseList() {
-        return request("/cruise/list?businessId=" + globalData.businessId, null, "get", false).catch(()=>{
+        return request("/cruise/list?businessId=" + globalData.businessId, null, "get", false).catch(() => {
             return Promise.resolve([])
         })
     },

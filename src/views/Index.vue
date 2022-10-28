@@ -1,15 +1,17 @@
 
 <script lang="ts">
-import { defineComponent, reactive, ref } from 'vue'
+import { defineComponent, reactive, ref, watch } from 'vue'
 import store from '../store';
 import router from '../router';
 import settingUtil from '../js/settingUtil'
-import { robotUtil } from '../js/robotUtil';
+import { robotUtil, charing, Lowest_power } from '../js/robotUtil';
 import { currentfloor } from '../js//Datacollation'
+import { toast } from '../components/Toast/Toast';
 const userstore: any = store()
 export default defineComponent({
     setup() {
-        const CurrentF = currentfloor
+        let Uichange: any = '' //检查是否在充电中倒计时
+        const currentf = currentfloor
         const modelList: any = reactive([
             {
                 id: 0,
@@ -46,16 +48,45 @@ export default defineComponent({
         ])
         //是否展示切换送餐模式的弹框
         const selcte_type = ref<boolean>(false)
+        //是否显示充电中动画
+        const showcharAni = ref<boolean>(false)
+        //当前的模式是x
+        const current_Tab: any = ref(0)
+        if (userstore.customSetting.basic.currenttab) {
+            current_Tab.value = userstore.customSetting.basic.currenttab
+        }
+        //开始倒计时方法
+        function changeUistatus() {
+            clearTimeout(Uichange)
+            //30秒后检查
+            Uichange = setTimeout(() => {
+                if (userstore.robotstate.isCharging == true && !showcharAni.value && router.currentRoute.value.matched && router.currentRoute.value.matched[0].path == '/index') {
+                    showcharAni.value = true
+                }
+                clearTimeout(Uichange)
+            }, 30 * 1000);
+        }
+        //用户操作了 重新计时30s
+        function userOperation() {
+            showcharAni.value = false
+            changeUistatus()
+        }
+
+        //点击充电中动画
+        function charAniTap() {
+            if (userstore.robotstate.battery <= Lowest_power) {
+                toast.show('机器人电量低，请充电至20%以上使用')
+            } else {
+                showcharAni.value = false
+                changeUistatus()
+            }
+        }
+
         function changeType() {
             if (userstore.isModify) {
                 return
             }
             selcte_type.value = !selcte_type.value
-        }
-        //当前的模式是x
-        const current_Tab: any = ref(0)
-        if (userstore.customSetting.basic.currenttab) {
-            current_Tab.value = userstore.customSetting.basic.currenttab
         }
         changeTab(current_Tab.value)
         function gosetting() {
@@ -92,13 +123,28 @@ export default defineComponent({
         }
         function goStandby() {
             let standby = settingUtil.getStandbyStation()
-            console.log(standby, "standby")
             settingUtil.goStandby(standby)
         }
-        return { current_Tab, selcte_type, modelList, changeType, gosetting, hiddenmask, changeTab, goStandby, CurrentF }
+        // //监听
+        // watch(() => charing.value, (newvalue: any, oldvalue: any) => {
+        //     //无动画 并且在充电
+        //     if (showcharAni.value == false && newvalue == true && router.currentRoute.value.matched && router.currentRoute.value.matched[0].path == '/index') {
+        //         if (showcharAni.value == false) {
+        //             showcharAni.value = true
+        //         }
+        //     }
+        //     if (newvalue == false) {
+        //         if (showcharAni.value == true) {
+        //             showcharAni.value = false
+        //         }
+        //     }
+        // })
+        return { current_Tab, selcte_type, modelList, changeType, gosetting, hiddenmask, changeTab, goStandby, userOperation, currentf, charing, changeUistatus, charAniTap, showcharAni, Uichange, userstore }
     },
     beforeRouteEnter(to, from, next) {
+        //判断当前状态是不是充电状态
         next((e: any) => {
+            // e.changeUistatus()  //30后检查是否在充电状态
             robotUtil.getState_P().then((res: any) => {
                 if (res.isEmergencyStop == true) {
                     router.push({
@@ -129,11 +175,28 @@ export default defineComponent({
                     }
                 }
             }
+
+
         })
     }
 })
 </script>
 <template>
+
+    <!-- <div class="chaing_back" v-if="showcharAni" @click="charAniTap">
+        <div class="charing_cont">
+            <img src="../assets/img/charingback.png" style="width:100%;height: 100%;">
+            <div class="fontchar">
+                <img src="../assets/img/charinglight.png" style="width:39px;height: 53px;">
+                {{ userstore.robotstate.battery }}%
+            </div>
+        </div>
+
+        <div class="charingcurcle">
+            <img src="../assets/img/curcles.png" style="width:100%;height: 100%;">
+        </div>
+    </div> -->
+
     <div class="indexpage">
         <div class="tip">
             <div class="navposi">
@@ -142,19 +205,19 @@ export default defineComponent({
             <div class="type_select" @click="changeType">
                 <img src="../assets/img/select.png">
                 <div>
-                    <text v-if="current_Tab == 0&&!selcte_type">{{$t('index.kjsc')}}</text>
-                    <text v-if="current_Tab == 1&&!selcte_type">{{$t('index.ddsc')}}</text>
-                    <text v-if="current_Tab == 2&&!selcte_type">{{$t('index.yl')}}</text>
-                    <text v-if="current_Tab == 3&&!selcte_type">{{$t('index.xy')}}</text>
-                    <text v-if="selcte_type">{{$t(('index.sqcd'))}}</text>
+                    <text v-if="current_Tab == 0 && !selcte_type">{{ $t('index.kjsc') }}</text>
+                    <text v-if="current_Tab == 1 && !selcte_type">{{ $t('index.ddsc') }}</text>
+                    <text v-if="current_Tab == 2 && !selcte_type">{{ $t('index.yl') }}</text>
+                    <text v-if="current_Tab == 3 && !selcte_type">{{ $t('index.xy') }}</text>
+                    <text v-if="selcte_type">{{ $t(('index.sqcd')) }}</text>
                 </div>
             </div>
 
             <div class="return_box" @click="goStandby">
                 <img src="../assets/img/dirction.png">
-                <div>{{$t('index.fh')}}</div>
+                <div>{{ $t('index.fh') }}</div>
             </div>
-            <div class="current_local">{{$t('index.jqrdqdw')}} {{CurrentF}}L</div>
+            <div class="current_local">{{ $t('index.jqrdqdw') }} {{ currentf }}L</div>
         </div>
         <router-view v-slot="{ Component }">
             <keep-alive>
@@ -165,12 +228,12 @@ export default defineComponent({
         <div class="on_maskbox" v-if="selcte_type">
             <div class="select_box">
                 <div class="box_all">
-                    <div v-for="(item,index) in modelList" :key="index"
-                        :class="item.show?(current_Tab == index ? 'sel_b font2' : 'seln_b font2'):'disnone'"
+                    <div v-for="(item, index) in modelList" :key="index"
+                        :class="item.show ? (current_Tab == index ? 'sel_b font2' : 'seln_b font2') : 'disnone'"
                         @click="changeTab(item.id)">
-                        <img :src="current_Tab==index?item.img1:item.img2"
+                        <img :src="current_Tab == index ? item.img1 : item.img2"
                             style="height: 50px;width: 50px;margin-bottom: 5px;">
-                        <div>{{$t(item.name)}}</div>
+                        <div>{{ $t(item.name) }}</div>
                     </div>
 
 
@@ -178,7 +241,7 @@ export default defineComponent({
             </div>
             <div class="go_set">
                 <img src="../assets/img/index_set.png">
-                <div class="setfont" @click="gosetting">{{$t('index.sz')}}</div>
+                <div class="setfont" @click="gosetting">{{ $t('index.sz') }}</div>
             </div>
         </div>
     </div>
@@ -216,6 +279,7 @@ export default defineComponent({
     z-index: 3;
     box-sizing: border-box;
     margin-left: 29px;
+    text-align: center;
 }
 
 .return_box {
@@ -348,5 +412,44 @@ export default defineComponent({
 
 .disnone {
     display: none;
+}
+
+.chaing_back {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: 0;
+    background-color: rgba(0, 0, 0, 0.8);
+    z-index: 9999;
+}
+
+.charing_cont {
+    width: 474px;
+    height: 401px;
+    bottom: 160px;
+    position: absolute;
+    left: 50%;
+    margin-left: -200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+}
+
+.charingcurcle {
+    height: 121px;
+    width: 11px;
+    position: absolute;
+    bottom: 25px;
+    left: 50%;
+    margin-left: -5px;
+}
+
+.fontchar {
+    font-size: 63px;
+    font-weight: bold;
+    color: #333333;
+    position: absolute;
 }
 </style>

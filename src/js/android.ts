@@ -9,24 +9,7 @@ export const downloadStatus = reactive({
 
 export const compressStatu = ref(0)
 
-//test todo wife start
-//是否开启wife
-export const wifeEnable = ref('')
-
-//wife info
-export const wifeInfo = ref('')
-//wife列表
-export const wifeList = ref('')
-
-//更改连接状态
-export const wifecontentstatue = ref('')
-
-//忘记网络状态
-export const forgetwife = ref('')
-//连接网络状态
-export const connectwife = ref('')
-
-//wife监听
+//test todo wife start    //wife监听
 export const wifeEvent: any = ref('')
 //test todo wife end
 
@@ -45,30 +28,7 @@ const callJSCompressDone = (res: number) => {
 }
 
 //test todo wife start
-const callJSwifiEnable = (res: any) => {
-  wifeEnable.value = res
-}
-
-const callJSwifInfo = (res: any) => {
-  wifeInfo.value = res
-}
-
-const callJSwifList = (res: any) => {
-  wifeList.value = res
-}
-
-const callJSchangeStatu = (res: any) => {
-  wifecontentstatue.value = res
-}
-
-const callJSforgetWife = (res: any) => {
-  forgetwife.value = res
-}
-
-const callJSconnectWife = (res: any) => {
-  connectwife.value = res
-}
-const callJSwifeEvent = (res: any) => {
+const callJSBoastCase = (res: any) => {
   wifeEvent.value = res
 }
 
@@ -84,19 +44,7 @@ export function setWin(win: any) {
   win.callJSCompressDone = callJSCompressDone
   //test todo wife start
   //是否开启wife
-  win.callJSwifiEnable = callJSwifiEnable
-  //wife详情
-  win.callJSwifInfo = callJSwifInfo
-  //wife列表
-  win.callJSwifList = callJSwifList
-  //更改状态
-  win.callJSwifList = callJSchangeStatu
-  //忘记网络
-  win.callJSforgetWife = callJSforgetWife
-  //连接网络
-  win.callJSconnectWife = callJSconnectWife
-  //wife监听
-  win.callJSwifeEvent = callJSwifeEvent
+  win.callJSBoastCase = callJSBoastCase
   //test todo wife end
   app = win.apk
 }
@@ -139,7 +87,6 @@ export function OpenSetting() {
 
 
 export function appVersion() {
-  console.log(app)
   if (app) {
     return app.actionFromJsAppVersion()
   } else {
@@ -148,11 +95,51 @@ export function appVersion() {
 
 }
 
-
+//wifi
 export function wifi_command(event: any) {
   if (app) {
-    app.actionFromJsAndriodWife(event)
+    return app.actionFromJsHandleWifi(event)
   }
 }
+
+export function saveLogcatToFile() {
+  if (app) {
+    return app.actionFromJsSaveLogcatToFile()
+  }else{
+    return null
+  }
+}
+
+//检测是否连接网络
+export function getNetWorkInfo() {
+  if (app) {
+    return app.actionFromJsNetWorkInfo()
+  } else {
+    return 1
+  }
+}
+//检测网络是否可用
+export function isNetSystemUsable() {
+  if (app) {
+    return app.actionFromJsNetSystemUsable()
+  } else {
+    return true
+  }
+}
+
+//播放背景音乐
+export function audioJsPlay(id: any, volume: any) {
+  if (app) {
+    app.actionFromJsPlay(id, volume)
+  }
+}
+//停止播放音乐
+export function audioJsStop() {
+  if (app) {
+    app.actionFromJsStop()
+  }
+}
+
+
 
 

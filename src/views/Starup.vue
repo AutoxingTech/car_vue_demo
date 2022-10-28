@@ -8,8 +8,10 @@ import {
     installApk,
     webRefresh,
     appVersion,
+    getNetWorkInfo,
+    isNetSystemUsable
 } from "../js/android";
-import { ref, watch, defineComponent } from "@vue/runtime-core";
+import { ref, watch, defineComponent, reactive } from "@vue/runtime-core";
 import { okRequest, setToken } from "../js/okRequest";
 import { initTable, setCurrentFloor } from '../js/Datacollation'
 import { globalData } from "../js/globalData";
@@ -18,6 +20,8 @@ import { H5Version, AppMode } from "../js/globalConfig";
 import store from "../store";
 import { onBeforeRouteLeave } from "vue-router";
 import { useI18n } from 'vue-i18n'
+import { getLocale } from '../main'
+import { Rlog } from "../js/Rlog";
 const { t } = useI18n()
 let downWatch: Function, compressWatch: Function;
 const useStore = store()
@@ -36,6 +40,15 @@ const Abnormalcause = ref()  //错误弹框
 const downloading = ref(false) //正在下载
 const gosetting = ref(false) //是否跳转到设置页
 const setposeTip = ref(false)
+const NetWorkInfo = ref(getNetWorkInfo())
+// const isNetUsable = ref(isNetSystemUsable())
+const checklist = reactive(
+    [{
+        id: 0,
+        IsCheck: false
+    }]
+)
+const networkOut = ref(0)
 
 let timeoutgo: any = ''  //倒计时跳转
 
@@ -49,6 +62,7 @@ function resetDate() {
     gosetting.value = false
     setposeTip.value = false
     timeoutgo = false
+    networkOut.value = 0
 }
 
 //清除十次点击数据
@@ -58,12 +72,14 @@ function cleanData() {
     lastTime = 0
 }
 function initStart() {
-    //初始化
     resetDate()
     robotUtil.init().then((res: any) => {
         return robotUtil.connectRobot()
     }).then((res: any) => {
         globalData.sn = res.robotId;
+        return robotUtil.getBusinessId()
+    }).then((BusinessId: any) => {
+        Rlog(BusinessId, "BusinessId")
         return robotUtil.getToken(AppMode.WAN_APP);
     }).then((res: any) => {
         setToken(res);
@@ -80,6 +96,17 @@ function initStart() {
             const button = document.getElementById('app') as HTMLButtonElement;
             button.setAttribute("class", 'theme_' + '' + state.customSetting.basic.fontSize + '');
         })
+        const currentLanguage = getLocale()  //当前的语言
+        let languageindex = 1
+        if (currentLanguage == 'zh-cn') {
+            languageindex = 1
+        } else if (currentLanguage == 'en') {
+            languageindex = 2
+        } else if (currentLanguage == 'zh-tw') {
+            languageindex = 3
+        }
+        return robotUtil.setLanguage_R(languageindex)
+    }).then(() => {
         return CheackAppVersion()  //检查app版本
     }).then(() => {
         return CheckH5Version()    //检查h5版本
@@ -127,7 +154,47 @@ function initStart() {
     })
 
 }
+
+function StartPage() {
+    //启动 ===> 获取  是否跳过<无网络弹框> 直接执行“跳过”操作
+    if (localStorage.getItem('notipcheck') == '1') {
+        Rlog("选择了不再提示 执行跳过操作,检测网络")
+        chekwifi()
+    } else {
+        if (NetWorkInfo.value == 1) {
+            Rlog("当前网络状态————wifi")
+            //有网络的话 检测网络是否可用
+            networkOut.value = 0
+            chekwifi()
+        } else {
+            Rlog("未连接wifi")
+            //无网络 弹框
+            networkOut.value = 1
+        }
+    }
+}
+//检测网络是否可用
+function chekwifi() {
+    if (isNetSystemUsable()) {
+        Rlog("网络正常")
+        initStart()
+    } else {
+        Rlog("网络不可用")
+        networkOut.value = 2
+    }
+}
+
+// StartPage()
 initStart()
+// useStore.$patch((state: any) => {
+//     state.showLogs = true
+// })
+// function getuse() {
+//     NetWorkInfo.value = getNetWorkInfo()
+//     isNetUsable.value = isNetSystemUsable()
+// }
+
+
 //跳转
 function redirectPage(e: any) {
     router.replace({
@@ -280,7 +347,36 @@ onBeforeRouteLeave((to, from) => {
         gosetting.value = true
     }
 })
-defineExpose({ navPage, useStore, gosetting });
+//切换选择
+function changeinput() {
+    checklist[0].IsCheck = !checklist[0].IsCheck
+}
+//去wifi设置页面
+function gowifi() {
+    if (checklist[0].IsCheck == true) {
+        Rlog('选择了不再展示非wifi弹框')
+        localStorage.setItem('notipcheck', '1')
+    }
+    networkOut.value = 0
+    router.push('./WifeSetting')
+}
+
+// 跳过继续执行获取机器人sn	
+function skipout() {
+    if (checklist[0].IsCheck == true) {
+        Rlog('选择了不再展示非wifi弹框')
+        localStorage.setItem('notipcheck', '1')
+    }
+    networkOut.value = 0
+    chekwifi()
+}
+
+//网络不可用的话就重试
+function tryAgain() {
+    networkOut.value = 0
+    chekwifi()
+}
+defineExpose({ navPage, useStore, gosetting, chekwifi });
 </script>
 <script lang="ts">
 export default defineComponent({
@@ -302,94 +398,153 @@ export default defineComponent({
                 }
             });
         } else {
-            next((vm) => {
-                const instance: any = vm;
-                if (instance.useStore.reFresh) {
-                    instance.useStore.$patch((state: any) => {
-                        state.reFresh = false
-                        location.reload()
-                    })
-                }
-            })
+            if (from.fullPath == "/WifeSetting") {
+                next((vm) => {
+                    const instance: any = vm;
+                    instance.chekwifi()
+                })
+            } else {
+                next((vm) => {
+                    const instance: any = vm;
+                    if (instance.useStore.reFresh) {
+                        instance.useStore.$patch((state: any) => {
+                            state.reFresh = false
+                            location.reload()
+                        })
+                    }
+                })
+            }
         }
     },
 });
 </script>
 <template>
+    <!-- <button @click="getuse" style="width:300px;height: 100px;">看能否可用</button>
+    网络类型:
+    <span v-if="NetWorkInfo==1">WiFi</span>
+    <span v-if="NetWorkInfo==0">SIM网络</span>
+    <span v-if="NetWorkInfo==-1">无网络</span>
+    可用吗:
+    {{isNetUsable}} -->
     <div class="top_header ocenter">
         <img src="../assets/img/logo.png" />
     </div>
     <div class="box_center">
-        <div class="mask_starok" v-if="CD==2">
+        <div class="mask_totaltip" v-if="CD == 2">
             <div>
                 <img src="../assets/img/checksuccess.png" />
             </div>
             <div>
-                {{$t('starup.sbjccg')}}
+                {{ $t('starup.sbjccg') }}
             </div>
         </div>
 
         <div class="box_header">
             <div>
                 <img src="../assets/img/starupico.png" />
-                <div>{{$t('starup.qzjqr')}}</div>
+                <div>{{ $t('starup.qzjqr') }}</div>
             </div>
-            <div>{{$t('starup.sbztjc')}}</div>
+            <div>{{ $t('starup.sbztjc') }}</div>
         </div>
         <!-- 各状态检测信息 -->
         <!-- 1 -->
         <div class="one_box noborder">
-            <div>{{$t('starup.jcjqrzt')}}</div>
+            <div>{{ $t('starup.jcjqrzt') }}</div>
             <div>
-                <img v-if="CA==1" class="loadingico roate_loading" src="../assets/img/loading.png" />
-                <img v-if="CA==2" class="loadingico" src="../assets/img/loadingover.png" />
+                <img v-if="CA == 1" class="loadingico roate_loading" src="../assets/img/loading.png" />
+                <img v-if="CA == 2" class="loadingico" src="../assets/img/loadingover.png" />
             </div>
         </div>
         <!-- 2 -->
         <div class="one_box">
-            <div>{{$t('starup.jcrjzy')}}</div>
+            <div>{{ $t('starup.jcrjzy') }}</div>
             <div>
-                <div class="lefttip" v-if="downloading">{{$t('starup.gxrjzy')}}</div>
-                <img v-if="CB==1" class="loadingico roate_loading" src="../assets/img/loading.png" />
-                <img v-if="CB==2" class="loadingico" src="../assets/img/loadingover.png" />
+                <div class="lefttip" v-if="downloading">{{ $t('starup.gxrjzy') }}</div>
+                <img v-if="CB == 1" class="loadingico roate_loading" src="../assets/img/loading.png" />
+                <img v-if="CB == 2" class="loadingico" src="../assets/img/loadingover.png" />
             </div>
         </div>
         <!-- 3 -->
         <div class="one_box">
-            <div>{{$t('starup.szzdxx')}}</div>
+            <div>{{ $t('starup.szzdxx') }}</div>
             <div>
-                <img v-if="CC==1" class="loadingico roate_loading" src="../assets/img/loading.png" />
-                <img v-if="CC==2" class="loadingico" src="../assets/img/loadingover.png" />
+                <img v-if="CC == 1" class="loadingico roate_loading" src="../assets/img/loading.png" />
+                <img v-if="CC == 2" class="loadingico" src="../assets/img/loadingover.png" />
             </div>
         </div>
         <!-- 4 -->
         <div class="one_box">
-            <div>{{$t('starup.jcdwxtt')}}</div>
+            <div>{{ $t('starup.jcdwxtt') }}</div>
             <div>
-                <div class="lefttip" v-if="setposeTip">{{$t('starup.qqszfw')}}</div>
-                <img v-if="CD==1" class="loadingico roate_loading" src="../assets/img/loading.png" />
-                <img v-if="CD==2" class="loadingico" src="../assets/img/loadingover.png" />
+                <div class="lefttip" v-if="setposeTip">{{ $t('starup.qqszfw') }}</div>
+                <img v-if="CD == 1" class="loadingico roate_loading" src="../assets/img/loading.png" />
+                <img v-if="CD == 2" class="loadingico" src="../assets/img/loadingover.png" />
             </div>
         </div>
 
     </div>
     <div class="set_buttom ocenter" @click="navsetting">
         <img src="../assets/img/set.png" />
-        <div>{{$t('starup.xtsz')}}</div>
+        <div>{{ $t('starup.xtsz') }}</div>
     </div>
 
     <!-- 流程弹框 -->
     <div class="ocenter startank" v-if="Abnormalcause">
         <div class="portrait horizontal tankcontent">
             <div @click="startBluetooth">
-                {{$t('starup.yc')}}
+                {{ $t('starup.yc') }}
             </div>
             <div>
-                {{Abnormalcause}}
+                {{ Abnormalcause }}
             </div>
             <div @click="TryRefresh">
-                {{$t('starup.cs')}}
+                {{ $t('starup.cs') }}
             </div>
+        </div>
+    </div>
+
+    <div class="ocenter startank" v-if="networkOut != 0">
+        <div class="portrait horizontal tankcontentip">
+            <div>
+                {{ $t('starup.ts') }}
+            </div>
+            <div v-if="networkOut == 1">
+                {{ $t('starup.jcdwlkwf') }}
+            </div>
+
+            <div v-if="networkOut == 2">
+                {{ $t('starup.wjcdkywl') }}
+            </div>
+
+            <div @click="changeinput" v-if="networkOut == 1"
+                style="height: 25px;width: 280px;font-size: 15px;line-height: 25px;margin-top: 10px;display: flex;align-items: center;">
+                <input type="checkbox" :value="checklist[0].id" v-model="checklist[0].IsCheck"
+                    style="margin-right: 6px;"><span>
+                    {{ $t('starup.qdsbzts') }}</span>
+            </div>
+
+            <div v-if="networkOut == 1">
+                <div class="twoenter">
+                    <div class="tip1" @click="gowifi">
+                        {{ $t('index.sz') }}
+                    </div>
+                    <div class="tip2" @click="skipout">
+                        {{ $t('starup.tg') }}
+                    </div>
+                </div>
+            </div>
+
+            <div v-if="networkOut == 2">
+                <div class="twoenter">
+                    <div class="tip1" @click="gowifi">
+                        {{ $t('index.sz') }}
+                    </div>
+                    <div class="tip2" @click="tryAgain">
+                        {{ $t('starup.cs') }}
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
     <!-- 地图不匹配弹框 -->
@@ -485,7 +640,7 @@ page {
 }
 
 .set_buttom {
-    width: 191px;
+    min-width: 191px;
     height: 63.5px;
     background-color: #83a9ff;
     margin: 0 auto;
@@ -500,6 +655,9 @@ page {
     font-size: 23px;
     font-weight: bold;
     z-index: 99999999999 !important;
+    padding: 0 15px;
+    box-sizing: border-box;
+
 }
 
 .set_buttom>img {
@@ -524,31 +682,39 @@ page {
     text-align: center;
 }
 
-.mask_starok {
-    width: 229px;
-    height: 110px;
-    background: #83a9ff;
+.mask_totaltip {
+    width: 240px;
+    height: 130px;
+    background: #3EC130;
     opacity: 0.8;
     border-radius: 31px;
-    position: absolute;
-    top: 146px;
+    position: fixed;
+    top: 50%;
     left: 50%;
+    margin-top: -55px;
     margin-left: -114.5px;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
+    color: white;
+    font-weight: bold;
+    z-index: 99999;
+    box-sizing: border-box;
 }
 
-.mask_starok>div:nth-child(1)>img {
+
+.mask_totaltip>div:nth-child(1)>img {
     width: 30px;
     height: 30px;
 }
 
-.mask_starok>div:nth-child(2) {
+.mask_totaltip>div:nth-child(2) {
+    text-align: center;
     font-size: 23px;
-    font-weight: bold;
-    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 
@@ -629,6 +795,60 @@ page {
 .lefttip {
     font-size: 20px;
     color: red;
+}
+
+.tankcontentip>div:nth-child(1) {
+    line-height: 60px;
+    color: #F03800;
+    text-align: center;
+    font-weight: Bold;
+    font-size: 22px;
+}
+
+.tankcontentip>div:nth-child(2) {
+    width: 280px;
+    line-height: 32px;
+    color: #333333;
+    text-align: center;
+    font-weight: Bold;
+    font-size: 16px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+.twoenter {
+    width: 240px;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.tip1 {
+    width: 105px;
+    height: 44px;
+    line-height: 44px;
+    margin-top: 25px;
+    text-align: center;
+    background-color: #83a9ff;
+    color: white;
+    font-size: 15px;
+    font-weight: bold;
+    border-radius: 8px;
+    box-sizing: border-box;
+}
+
+.tip2 {
+    width: 105px;
+    height: 44px;
+    line-height: 44px;
+    margin-top: 25px;
+    text-align: center;
+    color: #333;
+    font-size: 15px;
+    font-weight: bold;
+    border-radius: 8px;
+    border: 1px solid gray;
+    box-sizing: border-box;
 }
 </style>
         

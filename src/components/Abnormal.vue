@@ -2,21 +2,33 @@
 import store from '../store/index'
 import settingUtil from '../js/settingUtil';
 import router from '../router';
+import { robotUtil } from '../js/robotUtil';
 const storeMe = store()
 let tap_num = 0 //点击次数
 let curTime: any = 0 //当前时间戳
 let lastTime: any = 0 //最后一次点击的时间戳
 //关闭异常弹框 操作
-const closeAbor = () => {
+function closeAbor() {
     settingUtil.restart() //重启
     settingUtil.AbnormalControl(0)
 }
-const cleanData = () => {
+//清除点击次数
+function cleanData() {
     tap_num = 0
     curTime = 0
     lastTime = 0
 }
-const startBluetooth = () => {
+function closeAborCharge() {//对撞失败弹窗关闭
+    robotUtil.stopPlayAudio()
+    robotUtil.motionForAuto()
+    settingUtil.AbnormalControl(0)
+}
+function wheelsUnStuck() {
+    robotUtil.removeWheelOverload()
+}
+
+//点击十次
+function startBluetooth() {
     let time1: any = new Date()
     tap_num++;
     if (tap_num == 1) {
@@ -45,18 +57,60 @@ const startBluetooth = () => {
 }
 </script>
 <template>
-    <div v-if="storeMe.showAbnormal!=0">
-        <!-- 异常重启弹框 -->
-        <div v-if="storeMe.showAbnormal==1" class="ocenter abnormaltank">
+    <div v-if="storeMe.showAbnormal != 0">
+        <!-- 异常重启弹框  start-->
+        <div v-if="storeMe.showAbnormal == 1" class="ocenter abnormaltank">
             <div class="erroinner">
                 <div class="ico_sty" @click="startBluetooth">
                     <img src="../assets/img/robotstop.png" style="width:100%;height: 100%;">
                 </div>
-                <div class="tip1">{{$t('abnormal.jqrztyc')}}</div>
-                <div class="tip2">{{$t('abnormal.qjjqrtz')}}</div>
-                <div class="enter1" @click="closeAbor">{{$t('abnormal.cq')}}</div>
+                <div class="tip1">{{ $t('abnormal.jqrztyc') }}</div>
+                <div class="tip2">{{ $t('abnormal.qjjqrtz') }}</div>
+                <div class="enter1" @click="closeAbor">{{ $t('abnormal.cq') }}</div>
             </div>
         </div>
+        <!-- 异常重启弹框  end-->
+
+        <!-- 对桩失败  start-->
+        <div v-if="storeMe.showAbnormal == 2" class="ocenter abnormaltank">
+            <div class="erroinner">
+                <div class="ico_sty" @click="startBluetooth">
+                    <img src="../assets/img/andzsb.png" style="width:100%;height: 100%;">
+                </div>
+                <div class="tip1">{{ $t('abnormal.xzdzsb') }}</div>
+                <div class="tip2">{{ $t('abnormal.qbwthcdz') }}</div>
+                <div class="enter1" @click="closeAborCharge">{{ $t('abnormal.ytztdz') }}</div>
+            </div>
+        </div>
+        <!-- 对桩失败  end-->
+
+        <!-- 小舟卡住了 请推我一把   start-->
+        <div v-if="storeMe.showAbnormal == 3" class="ocenter abnormaltank">
+            <div class="erroinner">
+                <div class="ico_sty" @click="startBluetooth">
+                    <img src="../assets/img/anshibai.png" style="width:100%;height: 100%;">
+                </div>
+                <div class="tip1">{{ $t('abnormal.xzkzl') }}</div>
+                <div class="tip2">{{ $t('abnormal.qtwyb') }}</div>
+                <div class="enter1" @click="wheelsUnStuck()">{{ $t('crash.jxrw') }}</div>
+            </div>
+        </div>
+        <!-- 小舟卡住了 请推我一把  end-->
+
+
+        <!-- 小舟卡住了  请把我推出电梯  start-->
+        <div v-if="storeMe.showAbnormal == 4" class="ocenter abnormaltank">
+            <div class="erroinner">
+                <div class="ico_sty" @click="startBluetooth">
+                    <img src="../assets/img/anshibai.png" style="width:100%;height: 100%;">
+                </div>
+                <div class="tip1">{{ $t('abnormal.xzkzl') }}</div>
+                <div class="tip2">{{ $t(('abnormal.qbwtcdtw')) }}</div>
+                <div class="enter1" @click="wheelsUnStuck()">{{ $t('crash.jxrw') }}</div>
+            </div>
+        </div>
+        <!-- 小舟卡住了 请把我推出电梯  end-->
+
     </div>
 </template>
 

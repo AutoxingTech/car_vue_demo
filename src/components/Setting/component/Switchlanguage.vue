@@ -38,7 +38,6 @@ const choiceLanguage = (e: any) => {
     currentLanguage.value = e.char
 }
 const Enerchange = () => {
-    console.log(currentLanguage.value)
     emits("last-changelan", currentLanguage.value)
 }
 
@@ -46,18 +45,18 @@ const Enerchange = () => {
 <template>
     <div class="mask_on" v-if="showChangeLan">
         <div class="change_cont">
-            <div class="language_top font6">{{$t('setting.dyylb')}}</div>
+            <div class="language_top font6">{{ $t('setting.dyylb') }}</div>
             <div class="language_center">
-                <div v-for="(item,index) in languagelist" :key="index" @click="choiceLanguage(item)">
+                <div v-for="(item, index) in languagelist" :key="index" @click="choiceLanguage(item)">
                     <div class="language_center_left">
-                        <div class="font6">{{item.language}}</div>
-                        <div>{{item.desc}}</div>
+                        <div class="font6">{{ item.language }}</div>
+                        <div>{{ item.desc }}</div>
                     </div>
                     <div class="rght1">
                         <!-- <img
                             :src="currentLanguage==item.char?'/src/assets/img/language1.png':'/src/assets/img/selout.png'"> -->
 
-                        <img v-if="currentLanguage==item.char" src="../../../assets/img/language1.png" />
+                        <img v-if="currentLanguage == item.char" src="../../../assets/img/language1.png" />
                         <img v-else src="../../../assets/img/selout.png" />
                     </div>
                 </div>
@@ -65,8 +64,8 @@ const Enerchange = () => {
             </div>
 
             <div class="language_meth font7">
-                <div @click="Canclechange">{{$t('index.qx')}}</div>
-                <div @click="Enerchange">{{$t('setting.qhyy')}}</div>
+                <div @click="Canclechange">{{ $t('index.qx') }}</div>
+                <div @click="Enerchange">{{ $t('setting.qhyy') }}</div>
             </div>
         </div>
 

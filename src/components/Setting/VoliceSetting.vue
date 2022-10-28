@@ -7,7 +7,6 @@ import my_switch from "./component/Soundswitch.vue";
 import SongSelectVue from './component/SongSelect.vue';
 import { songlist } from '../../js/Datacollation'
 const useStore: any = store()
-console.log(useStore.customSetting)
 const Defaultsong: any = ref()
 const showSongsel = ref(false)
 const defaultsongname = ref()
@@ -87,6 +86,33 @@ const changesong = (e: any) => {
     showSongsel.value = false
 }
 
+
+const setmin = (e: any) => {
+    if (e == 1) {
+        volice1.value = 0
+        Sound1change(0)
+    } else if (e == 2) {
+        volice2.value = 0
+        Sound2change(0)
+    } else if (e == 3) {
+        volice3.value = 0
+        Sound3change(0)
+    }
+}
+
+const setmax = (e: any) => {
+    if (e == 1) {
+        volice1.value = 100
+        Sound1change(100)
+    } else if (e == 2) {
+        volice2.value = 100
+        Sound2change(100)
+    } else if (e == 3) {
+        volice3.value = 100
+        Sound3change(100)
+    }
+}
+
 </script>
 <template>
     <div>
@@ -95,56 +121,56 @@ const changesong = (e: any) => {
         </div>
         <div class="volive_control">
             <div class="volice1">
-                <div class="font4">{{$t('setting.sykz')}}</div>
+                <div class="font4">{{ $t('setting.sykz') }}</div>
                 <div>
                     <my_switch v-model="switchon" @change-switch="Changeswitch"></my_switch>
                 </div>
             </div>
             <div>
                 <div class="one_volice">
-                    <div class="font4">{{$t('setting.bjyy')}}</div>
+                    <div class="font4">{{ $t('setting.bjyy') }}</div>
                     <div class="volice_change">
-                        <img src="../../assets/img/jingyin.png" style="width:28px;height:23px">
+                        <img src="../../assets/img/jingyin.png" style="width:28px;height:23px" @click="setmin(1)">
                         <div class="center_control">
                             <VueSlider style="width: 100%;" v-bind="options1" v-model="volice1" @change="Sound1change"
                                 :tooltip-formatter="`${volice1}%`" />
                         </div>
-                        <img src="../../assets/img/nojingyin.png" style="width:27px;height:24px">
+                        <img src="../../assets/img/nojingyin.png" style="width:27px;height:24px" @click="setmax(1)">
                     </div>
                 </div>
             </div>
             <div>
                 <div class="one_volice">
-                    <div class="font4">{{$t('setting.bbyy')}}</div>
+                    <div class="font4">{{ $t('setting.bbyy') }}</div>
                     <div class="volice_change">
-                        <img src="../../assets/img/jingyin.png" style="width:28px;height:23px">
+                        <img src="../../assets/img/jingyin.png" style="width:28px;height:23px" @click="setmin(2)">
                         <div class="center_control">
                             <VueSlider style="width: 100%;" v-bind="options2" v-model="volice2" @change="Sound2change"
                                 :tooltip-formatter="`${volice2}%`" />
                         </div>
-                        <img src="../../assets/img/nojingyin.png" style="width:27px;height:24px">
+                        <img src="../../assets/img/nojingyin.png" style="width:27px;height:24px" @click="setmax(2)">
                     </div>
                 </div>
             </div>
             <div>
                 <div class="one_volice">
-                    <div class="font4">{{$t('setting.bzts')}}</div>
+                    <div class="font4">{{ $t('setting.bzts') }}</div>
                     <div class="volice_change">
-                        <img src="../../assets/img/jingyin.png" style="width:28px;height:23px">
+                        <img src="../../assets/img/jingyin.png" style="width:28px;height:23px" @click="setmin(3)">
                         <div class="center_control">
                             <VueSlider style="width: 100%;" v-bind="options3" v-model="volice3" @change="Sound3change"
                                 :tooltip-formatter="`${volice3}%`" />
                         </div>
-                        <img src="../../assets/img/nojingyin.png" style="width:27px;height:24px">
+                        <img src="../../assets/img/nojingyin.png" style="width:27px;height:24px" @click="setmax(3)">
                     </div>
                 </div>
             </div>
         </div>
 
         <div class="vone_setbox" @click="TankControl">
-            <div class="vsetname font4">{{$t('setting.bjyyxz')}}</div>
+            <div class="vsetname font4">{{ $t('setting.bjyyxz') }}</div>
             <div class="vbox_rightset">
-                <div class="font5" style="margin-right:20px">{{defaultsongname}}</div>
+                <div class="font5" style="margin-right:20px">{{ defaultsongname }}</div>
                 <img src="../../assets/img/setting_arrow_down.png" style="width: 16px;height: 9px;">
             </div>
         </div>
@@ -189,7 +215,7 @@ const changesong = (e: any) => {
 .volice_change {
     position: absolute;
     right: 0;
-    width: 310px;
+    width: 584px;
     bottom: 0;
     height: 100%;
     display: flex;
@@ -198,7 +224,7 @@ const changesong = (e: any) => {
 }
 
 .center_control {
-    width: 233px;
+    width: 497px;
     height: 100%;
     display: flex;
     align-items: center;

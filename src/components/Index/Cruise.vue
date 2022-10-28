@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { ref, reactive } from 'vue';
-import { CuriseLists, poiMap } from '../../js/Datacollation';
+import { curiseLists, modelAudioMap } from '../../js/Datacollation';
 import { okRequest } from '../../js/okRequest';
 import { audioMode, ActionType } from "../../js/globalConfig"
 import settingUtil from "../../js/settingUtil"
@@ -18,7 +18,7 @@ const curiseType: any = ref(0) //循环类型
 const FicrunNum = ref(2) //循环次数
 const circulatequene: any = reactive([]) //地图循环显示的数据
 const curiseMaps: any = reactive({  //地图列表数据
-    curiseList: CuriseLists
+    curiseList: curiseLists
 })
 for (let i = 1; i <= 12; i++) { //初始化巡游站点位置
     let left, tag, top
@@ -160,7 +160,7 @@ function setinput(e: any) {
 //站点语音
 function volumeculation(e: any) {
     let currentcast = null
-    let broadcasts = poiMap[1 + ""]  //1==巡游
+    let broadcasts = modelAudioMap[1 + ""]  //1==巡游
     if (broadcasts[e + ""] != undefined) {
         currentcast = broadcasts[e + ""]
     }
@@ -176,7 +176,7 @@ function volumeculation(e: any) {
         // 1 按播报次数  2按照播报时间
         if (currentcast.ruleType == 1) {
             Fobj.num = currentcast.ruleCount
-        } else if (currentcast.runType == 2) {
+        } else if (currentcast.ruleType == 2) {
             Fobj.duration = currentcast.ruleDuration
         }
         return Fobj
@@ -247,6 +247,7 @@ function goTask() {
                     y: poi.coordinate[1],
                     yaw: poi.yaw,
                     areaId: poi.areaId,
+                    dockingRadius: (poi.properties && poi.properties.dockingRadius) ? poi.properties.dockingRadius : 0.5,
                     //托盘
                     ext: {
                         name: poi.name,
@@ -276,8 +277,9 @@ function goTask() {
                 y: standby.coordinate[1],
                 yaw: standby.yaw,
                 areaId: standby.areaId,
+                dockingRadius: (standby.properties && standby.properties.dockingRadius) ? standby.properties.dockingRadius : 0.5,
                 ext: {
-                    name: "返航中",//standby.name,
+                    name: t('setting.fhz'),//standby.name,
                     id: standby.id
                 },
                 stepActs: [
@@ -289,18 +291,6 @@ function goTask() {
                     name: "起点",//起点要做的事件
                 },
                 stepActs: [
-                    {
-                        type: ActionType.PlayAudio,//背景音乐
-                        data: {
-                            mode: audioMode,
-                            audioId: settingUtil.getbackgroundSong(),
-                            num: 999,
-                            volume: userstore.customSetting.sound.switchon ? userstore.customSetting.sound.voiceVolume : 0,
-                            interval: -1,
-                            duration: -1,
-                            channel: 2
-                        },
-                    },
                     {
                         type: ActionType.SetSpeed,  //速度设置
                         data: {
@@ -334,13 +324,13 @@ function goTask() {
     <div class="curise_cont">
         <div class="cursie_top">
             <div>
-                <div class="mapfont">{{$t('index.xydt')}}</div>
+                <div class="mapfont">{{ $t('index.xydt') }}</div>
                 <div class="emptyline"></div>
             </div>
             <div class="curise_maplist" @click="tank_control">
-                <div v-if="curiseMaps.curiseList&&curiseMaps.curiseList.length>0">
-                    {{curiseMaps.curiseList[currentmapId].name}}</div>
-                <div>{{$t('index.qh')}}</div>
+                <div v-if="curiseMaps.curiseList && curiseMaps.curiseList.length > 0">
+                    {{ curiseMaps.curiseList[currentmapId].name }}</div>
+                <div>{{ $t('index.qh') }}</div>
             </div>
         </div>
 
@@ -351,31 +341,31 @@ function goTask() {
                     style="position: absolute;margin: 74px 0 0 41px;width: 1046px;height: 225px;border: 3px dashed #FFFFFF;border-radius: 31px;">
                 </view>
                 <!-- 61 0 0 54 816 210 -->
-                <div v-for="(item,index) in circulatequene">
-                    <view v-if="item.tag<2&&item.table" class="portrait horizontal"
-                        :style="'position: absolute;width: 175px;margin: '+item.top+'px 0 0 '+item.left+'px;'">
+                <div v-for="(item, index) in circulatequene">
+                    <view v-if="item.tag < 2 && item.table" class="portrait horizontal"
+                        :style="'position: absolute;width: 175px;margin: ' + item.top + 'px 0 0 ' + item.left + 'px;'">
                         <view
                             style="font-size: 16px;color: #333333;;margin-bottom: 16px;line-height: 16px;height: 16px;">
-                            {{item.tag==0?item.table.poiName:' '}}
+                            {{ item.tag == 0 ? item.table.poiName : ' ' }}
                         </view>
                         <view style="width: 23px;height: 23px;background-color: #83A9FF;border-radius: 50%;"></view>
                         <view style="font-size: 16px;color: #333333;;margin-top:16px;line-height: 16px;height: 16px;">
-                            {{item.tag==1?item.table.poiName:' '}}
+                            {{ item.tag == 1 ? item.table.poiName : ' ' }}
                         </view>
                     </view>
-                    <view v-else-if="item.tag==2&&item.table" class="landscape reverser horizontal"
-                        :style="'position: absolute;margin: '+item.top+'px 0 0 '+item.left+'px;'">
+                    <view v-else-if="item.tag == 2 && item.table" class="landscape reverser horizontal"
+                        :style="'position: absolute;margin: ' + item.top + 'px 0 0 ' + item.left + 'px;'">
                         <view style="width: 23px;height: 23px;background-color: #83A9FF;border-radius: 50%;"></view>
                         <view
                             style="font-size: 16px;color: #333333;;margin-right: 12px;width: 180px;text-align: right;">
-                            {{item.table.poiName}}
+                            {{ item.table.poiName }}
                         </view>
                     </view>
-                    <view v-else-if="item.tag==3&&item.table" class="landscape  horizontal"
-                        :style="'position: absolute;margin: '+item.top+'px 0 0 '+item.left+'px;'">
+                    <view v-else-if="item.tag == 3 && item.table" class="landscape  horizontal"
+                        :style="'position: absolute;margin: ' + item.top + 'px 0 0 ' + item.left + 'px;'">
                         <view style="width: 23px;height: 23px;background-color: #83A9FF;border-radius: 50%;"></view>
                         <view style="font-size: 16px;color: #333333;;margin-left: 12px;width: 180px;">
-                            {{item.table.poiName}}
+                            {{ item.table.poiName }}
                         </view>
                     </view>
                 </div>
@@ -396,58 +386,58 @@ function goTask() {
         <div class="curise_bottom">
             <div class="curise_enter1" @click="tank_control2">
                 <div>
-                    <span v-if="curiseType==0">{{$t('index.xhxy')}}</span>
-                    <span v-if="curiseType==1">{{$t('index.acxy')}}</span>
+                    <span v-if="curiseType == 0">{{ $t('index.xhxy') }}</span>
+                    <span v-if="curiseType == 1">{{ $t('index.acxy') }}</span>
                 </div>
                 <img src="../../assets/img/curisedown.png">
             </div>
-            <div class="curise_enter2 font1" @click="goTask">{{$t('index.ljcf')}}</div>
+            <div class="curise_enter2 font1" @click="goTask">{{ $t('index.ljcf') }}</div>
         </div>
 
         <!-- //选择巡游图 -->
         <div class="cruise_tank" v-if="showChoicemaptank">
             <div class="curise_mapchoice">
-                <div class="mapchoice_top font6">{{$t('index.xylxxz')}}</div>
-                <div :class="curiseMaps.curiseList.length>4?'mp_content2':'mp_content'">
-                    <div v-for="(item,index) in curiseMaps.curiseList" :key="index" @click="choice_map(index)">
-                        <div class="font6">{{item.name}}</div>
+                <div class="mapchoice_top font6">{{ $t('index.xylxxz') }}</div>
+                <div :class="curiseMaps.curiseList.length > 4 ? 'mp_content2' : 'mp_content'">
+                    <div v-for="(item, index) in curiseMaps.curiseList" :key="index" @click="choice_map(index)">
+                        <div class="font6">{{ item.name }}</div>
                         <div class="curimg">
                             <img v-if="item.sel" src="../../assets/img/language1.png" alt="">
                             <img v-else src="../../assets/img/selout.png" alt="">
                         </div>
                     </div>
                 </div>
-                <div class="bottbutton">
-                    <div @click="tank_control">{{$t('index.qx')}}</div>
-                    <div @click="sel_map">{{$t('index.qd')}}</div>
+                <div class="bottbutton font7">
+                    <div @click="tank_control">{{ $t('index.qx') }}</div>
+                    <div @click="sel_map">{{ $t('index.qd') }}</div>
                 </div>
             </div>
         </div>
         <!-- //选择次数 -->
         <div class="cruise_tank" v-if="showChoicenumtank">
             <div class="curise_mapchoice">
-                <div class="mapchoice_top font6">{{$t('index.xylxxz')}}</div>
-                <div class="xunhuan1" @click="ficcuriseType=0">
+                <div class="mapchoice_top font6">{{ $t('index.xylxxz') }}</div>
+                <div class="xunhuan1" @click="ficcuriseType = 0">
                     <div class="font6">
-                        {{$t('index.xhxy')}}
+                        {{ $t('index.xhxy') }}
                     </div>
                     <div class="curimg">
-                        <img v-if="ficcuriseType==0" src="../../assets/img/language1.png" alt="">
+                        <img v-if="ficcuriseType == 0" src="../../assets/img/language1.png" alt="">
                         <img v-else src="../../assets/img/selout.png" alt="">
                     </div>
                 </div>
-                <div class="number_xun" @click="ficcuriseType=1">
+                <div class="number_xun" @click="ficcuriseType = 1">
                     <div class="xunhuan1">
                         <div class="font6">
-                            {{$t('index.acxy')}}
+                            {{ $t('index.acxy') }}
                         </div>
                         <div class="curimg">
-                            <img v-if="ficcuriseType==1" src="../../assets/img/language1.png" alt="">
+                            <img v-if="ficcuriseType == 1" src="../../assets/img/language1.png" alt="">
                             <img v-else src="../../assets/img/selout.png" alt="">
                         </div>
                     </div>
                     <div class="set_num">
-                        <div class="font6">{{$t('index.szxycs')}}</div>
+                        <div class="font6">{{ $t('index.szxycs') }}</div>
                         <div>
                             <div class="jian" @click="numDown">-</div>
                             <div class="putnum">
@@ -458,8 +448,8 @@ function goTask() {
                     </div>
                 </div>
                 <div class="bottbutton font7">
-                    <div @click="tank_control2">{{$t('index.qx')}}</div>
-                    <div @click="sel_num">{{$t('index.qd')}}</div>
+                    <div @click="tank_control2">{{ $t('index.qx') }}</div>
+                    <div @click="sel_num">{{ $t('index.qd') }}</div>
                 </div>
             </div>
         </div>
@@ -721,6 +711,7 @@ function goTask() {
     margin: 0 auto;
     margin-top: 27px;
     margin-bottom: 21px;
+    font-weight: bold;
 }
 
 .bottbutton>div:nth-child(1) {

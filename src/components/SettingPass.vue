@@ -35,18 +35,14 @@ function numClick(num: number) {
     errorSel.value = false
     if (props.defautType == 0) {
         //正常设置
-        console.log("正常设置")
         ComparePasswords(num, userstore.customSetting.basic.adminPass)
     } else {
         if (userstore.customSetting && userstore.customSetting.basic && userstore.customSetting.basic.adminPass) {
-            console.log("虚拟设置,已获取到服务器密码")
             ComparePasswords(num, userstore.customSetting.basic.adminPass)
         } else {
-            console.log("虚拟设置,无服务器密码 但本地存有密码")
             if (localStorage.getItem('adminPass')) {
                 ComparePasswords(num, localStorage.getItem('adminPass'))
             } else {
-                console.log("虚拟设置,无服务器密码 无本地存有密码,使用默认密码")
                 let pass = '9999'
                 ComparePasswords(num, pass)
             }
@@ -138,27 +134,28 @@ function clear() {
     <div class="passbox" v-if="props.PasswordControl">
         <div style="height: 74px;position: absolute;" @click="navback">
             <div class="back_style">
-                {{$t('setting.tuichu')}}
+                {{ $t('setting.tuichu') }}
             </div>
         </div>
 
         <div class="kuang1" style="width: 950px;height: 604px;margin: 0 auto;margin-top: 74px; ">
             <!-- 顶 -->
             <div class="passtitle">
-                {{$t('setting.mmyz')}}
+                {{ $t('setting.mmyz') }}
             </div>
             <!-- 中 -->
             <div class="enterword">
-                <div v-for="(item,index) in tailNum" :key="index"
-                    :class="item.sel?(errorSel?'hasnum haserro':'hasnum'):''">
-                    {{item.num}}
+                <div v-for="(item, index) in tailNum" :key="index"
+                    :class="item.sel ? (errorSel ? 'hasnum haserro' : 'hasnum') : ''">
+                    {{ item.num }}
                 </div>
             </div>
 
             <!-- 下 -->
             <div class="landscape" style="flex-wrap: wrap;width: 740px;height: 390px;">
-                <div v-for="(item,index) in [1,2,3,4,5,6,7,8,9]" class="kg">
-                    <div @click="numClick(item)" :class="index==2||index==5||index==8?'kuangnum2':'kuangnum'">{{item}}
+                <div v-for="(item, index) in [1, 2, 3, 4, 5, 6, 7, 8, 9]" class="kg">
+                    <div @click="numClick(item)"
+                        :class="index == 2 || index == 5 || index == 8 ? 'kuangnum2' : 'kuangnum'">{{ item }}
                     </div>
                 </div>
                 <div style="width: 219px;margin-right: 41px;"></div>
@@ -168,7 +165,7 @@ function clear() {
                 </div>
             </div>
         </div>
-        <div class="error_mask" v-if="showerror">密码错误，请重新输入</div>
+        <div class="error_mask" v-if="showerror">{{ $t('setting.mmcwqxsr') }}</div>
     </div>
 </template>
 

@@ -5,15 +5,14 @@ import store from '../store'
 import { okRequest } from "../js/okRequest";
 import { globalData } from '../js/globalData';
 import SettingPassVue from '../components/SettingPass.vue';
+import { Rlog } from '../js/Rlog';
 const useStore = store()
 function exitSetting() {
-    console.log(useStore.customSetting)
-
     okRequest.upload_setting({
         settings: useStore.customSetting,
         robotId: globalData.sn
     }).then((res) => {
-        console.log(res, "res:保存设置")
+        Rlog(res, "setting:保存设置")
     })
     router.push({
         path: '/index'
@@ -76,7 +75,7 @@ const PasswordControl = ref(true)
 const hiddenPass = () => {
     PasswordControl.value = false
 }
-defineExpose({ selectCurrent, current_Set, PasswordControl });
+defineExpose({ selectCurrent, exitSetting, current_Set, PasswordControl });
 </script>
 
 <script lang="ts">
@@ -85,9 +84,13 @@ export default defineComponent({
         next((vm) => {
             const instance: any = vm;
             instance.selectCurrent(instance.current_Set)
-            if (from.fullPath != '/task') {
+            if (from.fullPath != '/task' && from.fullPath != '/WifeSetting') {
                 instance.PasswordControl = true
             }
+            if (from.fullPath == '/task' || from.fullPath == '/crashstop') {
+                instance.exitSetting()
+            }
+
 
         });
     },
@@ -103,18 +106,19 @@ export default defineComponent({
         <div class="set_content">
             <div class="set_left">
                 <div class="set_font1">
-                    {{$t('setting.szgl')}}
+                    {{ $t('setting.szgl') }}
                 </div>
                 <div class="set_list">
-                    <div class="set_control" v-for="(item,index) in setList" :key="index" @click="selectCurrent(index)">
-                        <div class="gip" v-if="current_Set==index"></div>
-                        <div :class="current_Set==index?'control_box':'control_box2'">
-                            <img :src="current_Set==index?item.img:item.img2">
-                            <div>{{$t(item.name)}}</div>
+                    <div class="set_control" v-for="(item, index) in setList" :key="index"
+                        @click="selectCurrent(index)">
+                        <div class="gip" v-if="current_Set == index"></div>
+                        <div :class="current_Set == index ? 'control_box' : 'control_box2'">
+                            <img :src="current_Set == index ? item.img : item.img2">
+                            <div>{{ $t(item.name) }}</div>
                         </div>
                     </div>
                 </div>
-                <div class="exit_set" @click="exitSetting">{{$t('setting.tcsz')}}</div>
+                <div class="exit_set" @click="exitSetting">{{ $t('setting.tcsz') }}</div>
             </div>
 
             <div class="set_right">

@@ -4,22 +4,17 @@ import VueSlider from 'vue-slider-component'
 import 'vue-slider-component/theme/default.css'
 import PallentSetting from '../Setting/component/PallentSetting.vue';
 import store from '../../store';
+import timeSet from './component/WifSwitch.vue'
 const useStore: any = store()
-const pallet: any = ref(useStore.customSetting.delivery.pallet); //托盘灯带数量
+const countdownSwitch = ref(true) //1开启 2关闭 送餐到达倒计时
+const pallet: any = ref(useStore.customSetting.delivery.pallet) //托盘灯带数量
 //到达取物点等待时长
-
 const time1 = ref(useStore.customSetting.delivery.stopDuration)
 const options1: any = ref({
     min: 10,
     max: 300,
     tooltip: 'always'
 })
-const Time1change = (e: any) => {
-    useStore.$patch((state: any) => {
-        state.customSetting.delivery.stopDuration = e
-    })
-}
-
 //暂停后倒计时时长
 const time2 = ref(useStore.customSetting.delivery.pauseDuration)
 const options2: any = ref({
@@ -27,12 +22,6 @@ const options2: any = ref({
     max: 60,
     tooltip: 'always'
 })
-const Time2change = (e: any) => {
-    useStore.$patch((state: any) => {
-        state.customSetting.delivery.pauseDuration = e
-    })
-}
-
 // 行走速度
 const speed1 = ref(useStore.customSetting.delivery.runSpeed)
 const options3: any = ref({
@@ -40,23 +29,55 @@ const options3: any = ref({
     max: 80,
     tooltip: 'always'
 })
-const speed1change = (e: any) => {
+//修改托盘相关信息
+const showPallent = ref(false)
+
+//不存在倒计时开关参数 默认设置为1
+if (useStore.customSetting.delivery.countdownSwitch == undefined) {
+    useStore.$patch((state: any) => {
+        state.customSetting.delivery.countdownSwitch = true
+    })
+} else {
+    countdownSwitch.value = useStore.customSetting.delivery.countdownSwitch
+}
+
+//修改到达取物点等待时长
+function Time1change(e: any) {
+    useStore.$patch((state: any) => {
+        state.customSetting.delivery.stopDuration = e
+    })
+}
+//修改暂停后倒计时时长
+function Time2change(e: any) {
+    useStore.$patch((state: any) => {
+        state.customSetting.delivery.pauseDuration = e
+    })
+}
+//修改行走速度
+function speed1change(e: any) {
     useStore.$patch((state: any) => {
         state.customSetting.delivery.runSpeed = e
     })
 }
-
-//修改托盘相关信息
-const showPallent = ref(false)
-const Pallentset = () => {
+//托盘设置
+function Pallentset() {
     showPallent.value = !showPallent.value
 }
-const setlastPallent = (e: any) => {
+//修改托盘
+function setlastPallent(e: any) {
     pallet.value = e
     useStore.$patch((state: any) => {
         state.customSetting.delivery.pallet = e
     })
     showPallent.value = !showPallent.value
+}
+
+//送餐倒计时的开关
+function switchcl() {
+    useStore.$patch((state: any) => {
+        state.customSetting.delivery.countdownSwitch = !state.customSetting.delivery.countdownSwitch
+        countdownSwitch.value = state.customSetting.delivery.countdownSwitch
+    })
 }
 
 </script>
@@ -67,18 +88,22 @@ const setlastPallent = (e: any) => {
         <div class="delive_setting">
             <div>
                 <div>
-                    <span class="delive_span1 font4">{{$t('setting.tpsz')}}</span>
-                    <span class="delive_span2">{{$t('setting.sztpcs')}}</span>
+                    <span class="delive_span1 font4">{{ $t('setting.tpsz') }}</span>
+                    <span class="delive_span2">{{ $t('setting.sztpcs') }}</span>
                 </div>
-                <div @click="Pallentset()">{{$t('setting.sztp')}}</div>
+                <div @click="Pallentset()">{{ $t('setting.sztp') }}</div>
             </div>
         </div>
 
         <div class="delive_setting2">
-            <div>
+            <div style="position:relative">
+                <div class="countdowenble">
+                    <div class="switchon" @click="switchcl"></div>
+                    <timeSet v-model="countdownSwitch"></timeSet>
+                </div>
                 <div class="delive_top">
-                    <span class="delive_span1 font4">{{$t('setting.pstlsj')}}</span>
-                    <span class="delive_span2">{{$t('setting.ddqwdddsc')}}</span>
+                    <span class="delive_span1 font4">{{ $t('setting.pstlsj') }}</span>
+                    <span class="delive_span2">{{ $t('setting.ddqwdddsc') }}</span>
                 </div>
                 <div class="delive_bottom">
                     <div>10s</div>
@@ -94,8 +119,8 @@ const setlastPallent = (e: any) => {
 
             <div>
                 <div class="delive_top">
-                    <span class="delive_span1 font4">{{$t('setting.psztsc')}}</span>
-                    <span class="delive_span2">{{$t('setting.zthdjssc')}}</span>
+                    <span class="delive_span1 font4">{{ $t('setting.psztsc') }}</span>
+                    <span class="delive_span2">{{ $t('setting.zthdjssc') }}</span>
                 </div>
                 <div class="delive_bottom">
                     <div>10s</div>
@@ -109,8 +134,8 @@ const setlastPallent = (e: any) => {
 
             <div>
                 <div class="delive_top">
-                    <span class="delive_span1 font4">{{$t('setting.xzsd')}}</span>
-                    <span class="delive_span2">{{$t('setting.szjqrswxssd')}}</span>
+                    <span class="delive_span1 font4">{{ $t('setting.xzsd') }}</span>
+                    <span class="delive_span2">{{ $t('setting.szjqrswxssd') }}</span>
                 </div>
                 <div class="delive_bottom">
                     <div>10cm/s</div>
@@ -270,5 +295,20 @@ const setlastPallent = (e: any) => {
 
 .delive_bottom_center .vue-slider-dot-tooltip-top {
     top: -6px;
+}
+
+.countdowenble {
+    position: absolute;
+    top: 16px;
+    right: 0px;
+}
+
+.switchon {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 99;
 }
 </style>
